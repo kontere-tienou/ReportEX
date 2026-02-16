@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -281,6 +282,7 @@ function App() {
                     {/* Route 404 */}
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
+                <SpeedInsights />
                 <Analytics />
             </BrowserRouter>
         </AuthProvider>
