@@ -165,7 +165,7 @@ export const getDepartmentMenuItems = (departmentId) => {
     return [
         ...baseItems,
         ...specificItems,
-        { name: 'Paramètres', href: 'settings', icon: 'Settings' }
+
     ];
 };
 

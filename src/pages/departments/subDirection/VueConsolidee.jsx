@@ -276,7 +276,7 @@ const VueConsolidee = () => {
                             • <strong>Commercial:</strong> Tendance à la baisse ce mois
                         </li>
                         <li className="text-sm text-red-800">
-                            • <strong>3 départements:</strong> Rapports en retard > 3 jours
+                            • <strong>3 départements:</strong> Rapports en retard  3 jours
                         </li>
                     </ul>
                 </div>

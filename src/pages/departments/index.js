@@ -23,14 +23,8 @@ export { default as SystemsMonitoring } from './subIT/SystemsMonitoring';
 export { default as TicketsIT } from './subIT/tickect';
 export { default as SystemAdmin } from './subIT/SystemAdmin';
 export { default as NotificationsIT } from './subIT/NotificationsIT';
-export { default as ParametresIT } from './subIT/ParametresIT';
-export { default as RapportsIT } from './subIT/RapportsIT';
-export { default as NewReportIT } from './subIT/NewReportIT';
-export { default as StatistiquesIT } from './subIT/StatistiquesIT';
 
 
 
 
 export { default as RHDashboard } from './RHDashboard';
-
-export {default as User} from '../User.jsx';
