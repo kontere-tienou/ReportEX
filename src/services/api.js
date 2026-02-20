@@ -52,13 +52,14 @@ export const reportService = {
     },
 
     // Example for other endpoints (create, get reports, etc.)
-    getTemplates: (departmentId) => api.get(`/reports/templates/${departmentId}`),
     createReport: (data) => api.post('/reports', data),
     getMyReports: (params) => api.get('/reports/my-reports', { params }),
-    getReport: (id) => api.get(`/reports/${id}`),
-    updateReport: (id, data) => api.put(`/reports/${id}`, data),
     submitReport: (id) => api.post(`/reports/${id}/submit`),
     validateReport: (id, data) => api.post(`/reports/${id}/validate`, data),
+    getAllReports: (params) => api.get("/reports", { params }),
+    deleteReport: (id) => api.delete(`/reports/${id}`),
+    getReportDetails: (params) => api.get(`/reports/${id}/details`),
+    updateReport: (id, payload) => api.put(`/reports/${id}`, payload),
 };
 
 
@@ -71,6 +72,20 @@ export const notificationService = {
     getAll: (params) => api.get('/notifications', { params }),
     markAsRead: (id) => api.put(`/notifications/${id}/read`),
     markAllAsRead: () => api.put('/notifications/read-all'),
+};
+
+
+export const reportAccessService = {
+    requestAccess: (reportId) => api.post(`/report-access/report/${reportId}/request`),
+    getPending: () => api.get(`/report-access/pending`),
+    approve: (id) => api.post(`/report-access/${id}/approve`),
+    reject: (id) => api.post(`/report-access/${id}/reject`),
+};
+
+export const reportCommentService = {
+    list: (reportId) => api.get(`/reports/${reportId}/comments`),
+    create: (reportId, comment) => api.post(`/reports/${reportId}/comments`, { comment }),
+    remove: (commentId) => api.delete(`/reports/comments/${commentId}`),
 };
 
 export default api;

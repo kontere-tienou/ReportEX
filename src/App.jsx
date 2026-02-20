@@ -12,13 +12,10 @@ import {
 } from "./pages/departments/index.js";
 import {AuthProvider} from "./context/AuthContext.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Reports from "./pages/Reports.jsx";
-import NewReport from "./pages/NewReport.jsx";
+import Reports from "./pages/departments/reports/Reports.jsx";
 import DepartmentRedirect from "./components/DepartmentRedirect.jsx";
 import DepartmentLayout from "./components/DepartmentLayout.jsx";
-import UIShowcase from "./pages/uiSowCase.jsx";
 import ParametresIT from "./pages/departments/subIT/ParametresIT.jsx";
-// ... vos autres imports
 
 function App() {
     return (
@@ -39,7 +36,6 @@ function App() {
                         {/* 1. Routes Communes (Accessibles via /departments/rh/profile, /departments/it/profile, etc.) */}
                         <Route path="notifications" element={<NotificationsIT />} />
                         <Route path="reports" element={<Reports />} />
-                        <Route path="reports/new" element={<NewReport />} />
                         <Route path="settings" element={<ParametresIT/>}/>
 
                         {/* 2. Le Dashboard dynamique */}

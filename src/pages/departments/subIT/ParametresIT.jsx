@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Settings, User, Bell, Lock, Mail, Save, Shield, Monitor } from 'lucide-react';
-import user from "../../User.jsx";
 
 const ParametresIT = () => {
     const [activeTab, setActiveTab] = useState('profile');
