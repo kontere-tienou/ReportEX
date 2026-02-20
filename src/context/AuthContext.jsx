@@ -8,14 +8,22 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Vérifier si l'utilisateur est déjà connecté
-        const token = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
+        const checkAuth = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    // Appelez un endpoint (ex: /me ou /profile) pour avoir les infos fraîches
+                    const response = await authService.getCurrentUser();
+                    setUser(response.data);
+                    localStorage.setItem('user', JSON.stringify(response.data));
+                } catch (error) {
+                    logout(); // Si le token est invalide
+                }
+            }
+            setLoading(false);
+        };
 
-        if (token && savedUser) {
-            setUser(JSON.parse(savedUser));
-        }
-        setLoading(false);
+        checkAuth();
     }, []);
 
     const login = async (credentials) => {

@@ -16,6 +16,7 @@ import Reports from "./pages/departments/reports/Reports.jsx";
 import DepartmentRedirect from "./components/DepartmentRedirect.jsx";
 import DepartmentLayout from "./components/DepartmentLayout.jsx";
 import ParametresIT from "./pages/departments/subIT/ParametresIT.jsx";
+import ReportDetails from "./pages/departments/reports/ReportDetails.jsx";
 
 function App() {
     return (
@@ -36,6 +37,7 @@ function App() {
                         {/* 1. Routes Communes (Accessibles via /departments/rh/profile, /departments/it/profile, etc.) */}
                         <Route path="notifications" element={<NotificationsIT />} />
                         <Route path="reports" element={<Reports />} />
+                        <Route path="reports/:id" element={<ReportDetails />} />
                         <Route path="settings" element={<ParametresIT/>}/>
 
                         {/* 2. Le Dashboard dynamique */}

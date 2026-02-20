@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {useNavigate, useParams} from "react-router-dom";
 import { reportService } from "../../../services/api.js";
 import { useAuth } from "../../../context/AuthContext.jsx";
 
 import {
     Plus, FileText, Calendar, Filter, LayoutGrid, List,
-    CheckCircle, XCircle, Clock, AlertCircle, Eye, Search
+    CheckCircle, XCircle, Clock, AlertCircle, Eye, Search, User2
 } from "lucide-react";
 
 import NewReportModal from "./NewReportModal.jsx";
@@ -20,6 +20,8 @@ const statusBadgeMap = {
 const StatusBadge = ({ status }) => {
     const badge = statusBadgeMap[status] || statusBadgeMap.brouillon;
     const Icon = badge.icon;
+    const { deptName } = useParams();
+
     return (
         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
       <Icon className="w-4 h-4 mr-1" />
@@ -30,6 +32,7 @@ const StatusBadge = ({ status }) => {
 
 export default function Reports() {
     const navigate = useNavigate();
+    const { deptName } = useParams();
     const { user } = useAuth();
 
     const isDirection = useMemo(() => {
@@ -70,13 +73,21 @@ export default function Reports() {
         loadReports();
     }, [filter, isDirection]);
 
+    useEffect(() => {
+        loadReports();
+    }, [filter, isDirection, deptName]);
+
+
     // search debounce simple
     useEffect(() => {
         const t = setTimeout(() => loadReports(), 350);
         return () => clearTimeout(t);
     }, [q]);
 
-    const goDetails = (id) => navigate(`/reports/${id}`);
+    const goDetails = (id) => {
+        navigate(`/departments/${deptName}/reports/${id}`);
+        console.log('Navigating to report with ID:', id);
+    };
 
     return (
         <div className="space-y-6">
@@ -221,6 +232,10 @@ export default function Reports() {
 
                             <div className="flex justify-end">
                                 <div className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
+                                    <User2 className="w-4 h-4 mr-1" />
+                                    by {user.rejete}
+                                </div>
+                                <div className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
                                     <Eye className="w-4 h-4 mr-1" />
                                     Voir les détails
                                 </div>
@@ -246,7 +261,6 @@ export default function Reports() {
                             onClick={() => goDetails(r.id)}
                         >
                             <div className="col-span-4">
-                                <p className="font-medium text-gray-900">{r.template_name}</p>
                                 <p className="text-xs text-gray-500">{r.frequency}</p>
                             </div>
                             <div className="col-span-2 text-sm text-gray-700">{r.department_name || "—"}</div>

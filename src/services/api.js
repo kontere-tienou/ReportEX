@@ -45,6 +45,24 @@ export const authService = {
     changePassword: (data) => api.post('/auth/change-password', data),
 };
 
+export const adminService = {
+
+    // USERS
+    getUsers: () => api.get("/users"),
+    getUser: (id) => api.get(`/users/${id}`),
+    createUser: (data) => api.post("/users", data),
+    updateUser: (id, data) => api.put(`/users/${id}`, data),
+    toggleUserStatus: (id) => api.patch(`/users/${id}/status`),
+    deleteUser: (id) => api.delete(`/users/${id}`),
+
+    // DEPARTMENTS
+    getDepartments: () => api.get("/departments"),
+    createDepartment: (data) => api.post("/departments", data),
+    updateDepartment: (id, data) => api.put(`/departments/${id}`, data),
+    deleteDepartment: (id) => api.delete(`/departments/${id}`),
+
+};
+
 export const reportService = {
     // Ensure that the params are sent correctly with GET
     getDepartmentStats: (departmentId, params) => {
@@ -58,7 +76,7 @@ export const reportService = {
     validateReport: (id, data) => api.post(`/reports/${id}/validate`, data),
     getAllReports: (params) => api.get("/reports", { params }),
     deleteReport: (id) => api.delete(`/reports/${id}`),
-    getReportDetails: (params) => api.get(`/reports/${id}/details`),
+    getReportDetails: (id) => api.get(`/reports/${id}`),
     updateReport: (id, payload) => api.put(`/reports/${id}`, payload),
 };
 

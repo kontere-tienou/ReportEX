@@ -2,7 +2,7 @@
 
 export const DEPARTMENTS = {
     COMPTABILITE: {
-        id: 1,
+        id: 2,
         code: 'COMPTA',
         name: 'Comptabilité',
         color: '#10b981', // green
@@ -10,7 +10,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/comptabilite'
     },
     BUREAU_ETUDE: {
-        id: 2,
+        id: 3,
         code: 'BED',
         name: 'Bureau d\'Étude & Développement',
         color: '#8b5cf6', // purple
@@ -18,7 +18,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/bureau-etude'
     },
     MAINTENANCE: {
-        id: 3,
+        id: 4,
         code: 'MAINT',
         name: 'Maintenance',
         color: '#f59e0b', // amber
@@ -26,7 +26,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/maintenance'
     },
     FILATURE: {
-        id: 4,
+        id: 5,
         code: 'FILAT',
         name: 'Filature',
         color: '#6366f1', // indigo
@@ -34,7 +34,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/filature'
     },
     IMPRESSION: {
-        id: 5,
+        id: 6,
         code: 'IMPR',
         name: 'Impression',
         color: '#ec4899', // pink
@@ -42,7 +42,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/impression'
     },
     STOCK: {
-        id: 6,
+        id: 7,
         code: 'STOCK',
         name: 'Stock',
         color: '#14b8a6', // teal
@@ -50,7 +50,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/stock'
     },
     ACHATS: {
-        id: 7,
+        id: 8,
         code: 'ACHAT',
         name: 'Achats',
         color: '#f97316', // orange
@@ -58,7 +58,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/achats'
     },
     COMMERCIAL: {
-        id: 8,
+        id: 9,
         code: 'COMM',
         name: 'Commercial',
         color: '#3b82f6', // blue
@@ -66,7 +66,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/commercial'
     },
     INFORMATIQUE: {
-        id: 9,
+        id: 10,
         code: 'IT',
         name: 'Informatique',
         color: '#06b6d4', // cyan
@@ -74,7 +74,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/informatique'
     },
     RH: {
-        id: 10,
+        id: 11,
         code: 'RH',
         name: 'Ressources Humaines',
         color: '#ef4444', // red
@@ -82,7 +82,7 @@ export const DEPARTMENTS = {
         dashboardPath: '/departments/rh'
     },
     DIR: {
-        id: 11,
+        id: 1,
         code: 'DIR',
         name: 'Direction Générale',
         color: '#4a5dc0', // red
@@ -112,48 +112,48 @@ export const getDepartmentMenuItems = (departmentId) => {
 
     // Items spécifiques par département
     const departmentSpecificItems = {
-        1: [ // Comptabilité
+        2: [ // Comptabilité
             { name: 'Bilans', href: 'bilans', icon: 'DollarSign' },
             { name: 'Budget', href: 'budget', icon: 'TrendingUp' }
         ],
-        2: [ // Bureau d'Étude
+        3: [ // Bureau d'Étude
             { name: 'Projets', href: 'projects', icon: 'Lightbulb' },
             { name: 'Recherche', href: 'research', icon: 'Search' }
         ],
-        3: [ // Maintenance
+        4: [ // Maintenance
             { name: 'Interventions', href: 'interventions', icon: 'Tool' },
             { name: 'Équipements', href: 'equipments', icon: 'Cpu' }
         ],
-        4: [ // Filature
+        5: [ // Filature
             { name: 'Production', href: 'production', icon: 'Package' },
             { name: 'Qualité', href: 'quality', icon: 'CheckCircle' }
         ],
-        5: [ // Impression
+        6: [ // Impression
             { name: 'Commandes', href: 'orders', icon: 'ShoppingCart' },
             { name: 'Designs', href: 'designs', icon: 'Palette' }
         ],
-        6: [ // Stock
+        7: [ // Stock
             { name: 'Inventaire', href: 'inventory', icon: 'Archive' },
             { name: 'Mouvements', href: 'movements', icon: 'ArrowRightLeft' }
         ],
-        7: [ // Achats
+        8: [ // Achats
             { name: 'Fournisseurs', href: 'suppliers', icon: 'Users' },
             { name: 'Commandes', href: 'purchase-orders', icon: 'FileCheck' }
         ],
-        8: [ // Commercial
+        9: [ // Commercial
             { name: 'Clients', href: 'clients', icon: 'UserCheck' },
             { name: 'Ventes', href: 'sales', icon: 'TrendingUp' }
         ],
-        9: [ // Informatique
+        10: [ // Informatique
             { name: 'Tickets', href: 'tickets', icon: 'AlertCircle' },
             { name: 'Systèmes', href: 'systems', icon: 'Server' },
             { name: 'Administration', href: 'admin', icon: 'Shield' }
         ],
-        10: [ // RH
+        11: [ // RH
             { name: 'Employés', href: 'employees', icon: 'Users' },
             { name: 'Congés', href: 'leaves', icon: 'Calendar' }
         ],
-        11: [ // Direction
+        1: [ // Direction
             { name: 'Vue Consolidée', href: 'overview', icon: 'Eye' },
             { name: 'Départements', href: 'departments', icon: 'Building' },
             { name: 'Objectifs', href: 'objectives', icon: 'Target' }

@@ -11,6 +11,7 @@ import {
 
 const ReportDetails = () => {
     const { id } = useParams();
+    console.log('Report ID from URL:', id);
     const navigate = useNavigate();
     const { user } = useAuth();
     const { toasts, addToast, removeToast } = useToast();

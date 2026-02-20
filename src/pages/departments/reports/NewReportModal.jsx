@@ -124,7 +124,7 @@ export default function NewReportModal({ open, onClose, onCreated }) {
                                             Nouveau Rapport
                                         </h2>
                                         <p className="text-sm text-cyan-100">
-                                            {user.department.id}
+                                            {user.department.name}
                                         </p>
                                     </div>
                                 </div>

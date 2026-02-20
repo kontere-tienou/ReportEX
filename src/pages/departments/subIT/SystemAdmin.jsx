@@ -1,75 +1,78 @@
-import { useState } from 'react';
+import {useEffect, useState} from 'react';
 import {
     Users, Building2, Settings, Shield, Plus, Edit2, Trash2,
     Search, Key, UserCheck, UserX, RefreshCw, Download, Upload,
     AlertCircle, CheckCircle, Eye, EyeOff
 } from 'lucide-react';
+import {adminService} from "../../../services/api.js";
 
 const SystemAdmin = () => {
-    const [activeTab, setActiveTab] = useState('users');
-    const [searchTerm, setSearchTerm] = useState('');
     const [showUserModal, setShowUserModal] = useState(false);
     const [showDeptModal, setShowDeptModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
 
-    // Données utilisateurs
-    const users = [
-        {
-            id: 1,
-            username: 'admin',
-            full_name: 'Administrateur Système',
-            email: 'admin@batex-ci.com',
-            role: 'admin',
-            department: { id: 9, name: 'Informatique' },
-            status: 'active',
-            last_login: '2026-02-16 14:23',
-            created_at: '2025-01-15'
-        },
-        {
-            id: 2,
-            username: 'resp_maint',
-            full_name: 'Mamadou TRAORE',
-            email: 'mamadou@batex-ci.com',
-            role: 'responsable',
-            department: { id: 3, name: 'Maintenance' },
-            status: 'active',
-            last_login: '2026-02-16 09:15',
-            created_at: '2025-02-01'
-        },
-        {
-            id: 3,
-            username: 'validateur1',
-            full_name: 'Fatima KONE',
-            email: 'fatima@batex-ci.com',
-            role: 'validateur',
-            department: { id: 1, name: 'Comptabilité' },
-            status: 'active',
-            last_login: '2026-02-15 16:45',
-            created_at: '2025-01-20'
-        },
-        {
-            id: 4,
-            username: 'resp_comm',
-            full_name: 'Salif COULIBALY',
-            email: 'salif@batex-ci.com',
-            role: 'responsable',
-            department: { id: 8, name: 'Commercial' },
-            status: 'active',
-            last_login: '2026-02-16 11:30',
-            created_at: '2025-01-25'
-        },
-        {
-            id: 5,
-            username: 'ancien_user',
-            full_name: 'Ancien Employé',
-            email: 'ancien@batex-ci.com',
-            role: 'responsable',
-            department: { id: 7, name: 'Achats' },
-            status: 'inactive',
-            last_login: '2025-12-15 10:00',
-            created_at: '2024-06-10'
-        },
-    ];
+    const [activeTab, setActiveTab] = useState("users");
+    const [searchTerm, setSearchTerm] = useState("");
+    const [users, setUsers] = useState([]);
+    //const [departments, setDepartments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+
+
+
+    useEffect(() => {
+        fetchData();
+    },
+        []);
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+
+            const [usersRes, deptRes] = await Promise.all([
+                adminService.getUsers(),
+                adminService.getDepartments(),
+            ]);
+
+            setUsers(usersRes.data.users || []);
+            setDepartments(deptRes.data.departments || []);
+        } catch (err) {
+            console.error("Erreur chargement admin:",users.name, err);
+        } finally {
+            setLoading(false);
+        }
+    };
+    const toggleUser = async (id) => {
+        try {
+            await adminService.toggleUserStatus(id);
+            fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const deleteUser = async (id) => {
+        if (!window.confirm("Supprimer cet utilisateur ?")) return;
+
+        try {
+            await adminService.deleteUser(id);
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // ===============================
+    // HELPERS
+    // ===============================
+
+    const getRoleBadge = (role) => {
+        const badges = {
+            admin: "bg-purple-100 text-purple-800",
+            Director: "bg-blue-100 text-blue-800",
+            responsable: "bg-green-100 text-green-800",
+        };
+    }
+
 
     // Données départements
     const departments = [
@@ -86,19 +89,7 @@ const SystemAdmin = () => {
         { id: 11, name: 'Direction', code: 'DIR', responsible: 'Directeur Général', users_count: 2, active: true },
     ];
 
-    const getRoleBadge = (role) => {
-        const badges = {
-            admin: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Admin' },
-            validateur: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Validateur' },
-            responsable: { bg: 'bg-green-100', text: 'text-green-800', label: 'Responsable' }
-        };
-        const badge = badges[role] || badges.responsable;
-        return (
-            <span className={`px-2 py-1 rounded text-xs font-medium ${badge.bg} ${badge.text}`}>
-        {badge.label}
-      </span>
-        );
-    };
+
 
     const getStatusBadge = (status) => {
         return status === 'active' ? (
@@ -114,18 +105,23 @@ const SystemAdmin = () => {
         );
     };
 
-    const filteredUsers = users.filter(user =>
-        user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredUsers = users.filter(
+        user =>
+            user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const stats = {
         totalUsers: users.length,
-        activeUsers: users.filter(u => u.status === 'active').length,
-        admins: users.filter(u => u.role === 'admin').length,
-        departments: departments.length
+        activeUsers: users.filter((u) => u.is_active).length,
+        admins: users.filter((u) => u.role === "admin").length,
+        departments: departments.length,
     };
+        if (loading) {
+            return <div className="p-6">Chargement...</div>;
+        }
+
 
     return (
         <div className="space-y-6">
