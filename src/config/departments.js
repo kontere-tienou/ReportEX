@@ -5,7 +5,7 @@ export const DEPARTMENTS = {
         id: 2,
         code: 'COMPTA',
         name: 'Comptabilité',
-        color: '#10b981', // green
+        color: '#10b981',
         icon: '💰',
         dashboardPath: '/departments/comptabilite'
     },
@@ -13,7 +13,7 @@ export const DEPARTMENTS = {
         id: 3,
         code: 'BED',
         name: 'Bureau d\'Étude & Développement',
-        color: '#8b5cf6', // purple
+        color: '#8b5cf6',
         icon: '🔬',
         dashboardPath: '/departments/bureau-etude'
     },
@@ -21,7 +21,7 @@ export const DEPARTMENTS = {
         id: 4,
         code: 'MAINT',
         name: 'Maintenance',
-        color: '#f59e0b', // amber
+        color: '#f59e0b',
         icon: '🔧',
         dashboardPath: '/departments/maintenance'
     },
@@ -29,7 +29,7 @@ export const DEPARTMENTS = {
         id: 5,
         code: 'FILAT',
         name: 'Filature',
-        color: '#6366f1', // indigo
+        color: '#6366f1',
         icon: '🧵',
         dashboardPath: '/departments/filature'
     },
@@ -37,7 +37,7 @@ export const DEPARTMENTS = {
         id: 6,
         code: 'IMPR',
         name: 'Impression',
-        color: '#ec4899', // pink
+        color: '#ec4899',
         icon: '🎨',
         dashboardPath: '/departments/impression'
     },
@@ -45,7 +45,7 @@ export const DEPARTMENTS = {
         id: 7,
         code: 'STOCK',
         name: 'Stock',
-        color: '#14b8a6', // teal
+        color: '#14b8a6',
         icon: '📦',
         dashboardPath: '/departments/stock'
     },
@@ -53,7 +53,7 @@ export const DEPARTMENTS = {
         id: 8,
         code: 'ACHAT',
         name: 'Achats',
-        color: '#f97316', // orange
+        color: '#f97316',
         icon: '🛒',
         dashboardPath: '/departments/achats'
     },
@@ -61,7 +61,7 @@ export const DEPARTMENTS = {
         id: 9,
         code: 'COMM',
         name: 'Commercial',
-        color: '#3b82f6', // blue
+        color: '#3b82f6',
         icon: '💼',
         dashboardPath: '/departments/commercial'
     },
@@ -69,7 +69,7 @@ export const DEPARTMENTS = {
         id: 10,
         code: 'IT',
         name: 'Informatique',
-        color: '#06b6d4', // cyan
+        color: '#06b6d4',
         icon: '💻',
         dashboardPath: '/departments/informatique'
     },
@@ -77,7 +77,7 @@ export const DEPARTMENTS = {
         id: 11,
         code: 'RH',
         name: 'Ressources Humaines',
-        color: '#ef4444', // red
+        color: '#ef4444',
         icon: '👥',
         dashboardPath: '/departments/rh'
     },
@@ -85,7 +85,7 @@ export const DEPARTMENTS = {
         id: 1,
         code: 'DIR',
         name: 'Direction Générale',
-        color: '#4a5dc0', // red
+        color: '#4a5dc0',
         icon: '👥',
         dashboardPath: '/departments/dir'
     }
@@ -114,7 +114,12 @@ export const getDepartmentMenuItems = (departmentId) => {
     const departmentSpecificItems = {
         2: [ // Comptabilité
             { name: 'Bilans', href: 'bilans', icon: 'DollarSign' },
-            { name: 'Budget', href: 'budget', icon: 'TrendingUp' }
+            { name: 'Budget', href: 'budget', icon: 'TrendingUp' },
+            {name:'Journaux Comptables', href:'journal',icon:'TrendingUp'},
+            {name:'Comptabilité Analytique', href:'analyse',icon:'TrendingUp'},
+            {name:'Rapprochements Bancaires', href:'banque',icon:'TrendingUp'},
+            {name:'Factures Clients', href:'factures',icon:'TrendingUp'},
+            {name:'États Financiers & Rapports', href:'raports',icon:'TrendingUp'}
         ],
         3: [ // Bureau d'Étude
             { name: 'Projets', href: 'projects', icon: 'Lightbulb' },
@@ -151,7 +156,12 @@ export const getDepartmentMenuItems = (departmentId) => {
         ],
         11: [ // RH
             { name: 'Employés', href: 'employees', icon: 'Users' },
-            { name: 'Congés', href: 'leaves', icon: 'Calendar' }
+            { name: 'Congés', href: 'leaves', icon: 'Calendar' },
+            {name:'Contrats', href:'contrats', icon: 'Calendar' },
+            {name:'Recrutement', href:'recrutements', icon: 'Calendar' },
+            {name:'Paie & Notes de frais', href:'paroll', icon: 'Calendar' },
+            {name:'Sanctions / Absences' , href: 'sanctions', icon: 'Calendar' },
+            {name:'Historique RH', href:'historicalRH', icon: 'Calendar' },
         ],
         1: [ // Direction
             { name: 'Vue Consolidée', href: 'overview', icon: 'Eye' },

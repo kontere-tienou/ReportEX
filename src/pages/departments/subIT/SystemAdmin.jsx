@@ -1,29 +1,50 @@
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Users, Building2, Settings, Shield, Plus, Edit2, Trash2,
-    Search, Key, UserCheck, UserX, RefreshCw, Download, Upload,
-    AlertCircle, CheckCircle, Eye, EyeOff
+    Users,
+    Building2,
+    Settings,
+    Shield,
+    Plus,
+    Edit2,
+    Trash2,
+    Search,
+    Key,
+    UserCheck,
+    UserX,
+    CheckCircle,
+    AlertCircle,
 } from 'lucide-react';
-import {adminService} from "../../../services/api.js";
+import { adminService } from '../../../services/api';
+import UserModal from '../users/userModal.jsx';
+import DepartmentModal from '../departmentModal.jsx';
 
 const SystemAdmin = () => {
+    const [activeTab, setActiveTab] = useState('users');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const [users, setUsers] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
     const [showUserModal, setShowUserModal] = useState(false);
     const [showDeptModal, setShowDeptModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [selectedDept, setSelectedDept] = useState(null);
 
-    const [activeTab, setActiveTab] = useState("users");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [users, setUsers] = useState([]);
-    //const [departments, setDepartments] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [alert, setAlert] = useState(null);
 
-
-
-
+    // Fetch data on mount
     useEffect(() => {
         fetchData();
-    },
-        []);
+    }, []);
+
+    // Show alert helper
+    const showAlert = (message, type = 'success') => {
+        setAlert({ message, type });
+        setTimeout(() => setAlert(null), 5000);
+    };
+
+    // Fetch all data
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -33,114 +54,224 @@ const SystemAdmin = () => {
                 adminService.getDepartments(),
             ]);
 
-            setUsers(usersRes.data.users || []);
-            setDepartments(deptRes.data.departments || []);
+            const usersData =
+                usersRes?.data?.data?.users ||
+                usersRes?.data?.users ||
+                usersRes?.data?.data ||
+                [];
+
+            const departmentsData =
+                deptRes?.data?.data?.departments ||
+                deptRes?.data?.departments ||
+                deptRes?.data?.data ||
+                [];
+
+            setUsers(Array.isArray(usersData) ? usersData : []);
+            setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
         } catch (err) {
-            console.error("Erreur chargement admin:",users.name, err);
+            console.error("Erreur chargement admin:", err?.response?.data || err);
         } finally {
             setLoading(false);
         }
     };
-    const toggleUser = async (id) => {
+
+    // ==========================================
+    // USER CRUD
+    // ==========================================
+
+    const handleCreateUser = async (data) => {
         try {
-            await adminService.toggleUserStatus(id);
-            fetchData();
+            await adminService.createUser(data);
+            showAlert('Utilisateur créé avec succès');
+            await fetchData();
         } catch (err) {
-            console.error(err);
+            console.error('Error creating user:', err);
+            throw err;
         }
     };
 
-    const deleteUser = async (id) => {
-        if (!window.confirm("Supprimer cet utilisateur ?")) return;
+    const handleUpdateUser = async (data) => {
+        try {
+            await adminService.updateUser(selectedUser.id, data);
+            showAlert('Utilisateur modifié avec succès');
+            setSelectedUser(null);
+            await fetchData();
+        } catch (err) {
+            console.error('Error updating user:', err);
+            throw err;
+        }
+    };
+
+    const handleToggleUser = async (user) => {
+        try {
+            const isActive = user?.is_active === true || user?.status === 'active';
+
+            if (isActive) {
+                await adminService.deactivateUser(user.id);
+            } else {
+                await adminService.activateUser(user.id);
+            }
+
+            await fetchData();
+        } catch (err) {
+            console.error("Erreur toggle user:", err?.response?.data || err);
+        }
+    };
+
+
+    const handleDeleteUser = async (id) => {
+        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+            return;
+        }
 
         try {
             await adminService.deleteUser(id);
+            showAlert('Utilisateur supprimé');
             await fetchData();
         } catch (err) {
-            console.error(err);
+            console.error('Error deleting user:', err);
+            showAlert('Erreur lors de la suppression', 'error');
         }
     };
 
-    // ===============================
+    // ==========================================
+    // DEPARTMENT CRUD
+    // ==========================================
+
+    const handleCreateDepartment = async (data) => {
+        try {
+            await adminService.createDepartment(data);
+            showAlert('Département créé avec succès');
+            await fetchData();
+        } catch (err) {
+            console.error('Error creating department:', err);
+            throw err;
+        }
+    };
+
+    const handleUpdateDepartment = async (data) => {
+        try {
+            await adminService.updateDepartment(selectedDept.id, data);
+            showAlert('Département modifié avec succès');
+            setSelectedDept(null);
+            await fetchData();
+        } catch (err) {
+            console.error('Error updating department:', err);
+            throw err;
+        }
+    };
+
+    const handleDeleteDepartment = async (id) => {
+        if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce département ?')) {
+            return;
+        }
+
+        try {
+            await adminService.deleteDepartment(id);
+            showAlert('Département supprimé');
+            await fetchData();
+        } catch (err) {
+            console.error('Error deleting department:', err);
+            showAlert('Erreur lors de la suppression', 'error');
+        }
+    };
+
+    // ==========================================
     // HELPERS
-    // ===============================
+    // ==========================================
 
     const getRoleBadge = (role) => {
-        const badges = {
-            admin: "bg-purple-100 text-purple-800",
-            Director: "bg-blue-100 text-blue-800",
-            responsable: "bg-green-100 text-green-800",
+        const roleMap = {
+            ADMIN: { label: 'Admin', class: 'bg-purple-100 text-purple-800' },
+            DG: { label: 'Direction', class: 'bg-blue-100 text-blue-800' },
+            MANAGER: { label: 'Manager', class: 'bg-green-100 text-green-800' },
+            SUPERVISOR: { label: 'Superviseur', class: 'bg-amber-100 text-amber-800' },
+            USER: { label: 'Utilisateur', class: 'bg-gray-100 text-gray-800' },
+            VIEWER: { label: 'Lecteur', class: 'bg-slate-100 text-slate-800' },
         };
-    }
 
+        const roleData = roleMap[role?.toUpperCase()] || roleMap.USER;
 
-    // Données départements
-    const departments = [
-        { id: 1, name: 'Comptabilité', code: 'COMPTA', responsible: 'Fatima KONE', users_count: 5, active: true },
-        { id: 2, name: 'Bureau d\'Étude', code: 'BED', responsible: 'Amadou DIALLO', users_count: 8, active: true },
-        { id: 3, name: 'Maintenance', code: 'MAINT', responsible: 'Mamadou TRAORE', users_count: 12, active: true },
-        { id: 4, name: 'Filature', code: 'FILAT', responsible: 'Aissata SANGARE', users_count: 25, active: true },
-        { id: 5, name: 'Impression', code: 'IMPR', responsible: 'Ousmane TOURE', users_count: 18, active: true },
-        { id: 6, name: 'Stock', code: 'STOCK', responsible: 'Mariam CISSE', users_count: 8, active: true },
-        { id: 7, name: 'Achats', code: 'ACHAT', responsible: 'Ibrahim KEITA', users_count: 6, active: true },
-        { id: 8, name: 'Commercial', code: 'COMM', responsible: 'Salif COULIBALY', users_count: 15, active: true },
-        { id: 9, name: 'Informatique', code: 'IT', responsible: 'Sekou DIARRA', users_count: 4, active: true },
-        { id: 10, name: 'RH', code: 'RH', responsible: 'Aminata BA', users_count: 5, active: true },
-        { id: 11, name: 'Direction', code: 'DIR', responsible: 'Directeur Général', users_count: 2, active: true },
-    ];
-
-
-
-    const getStatusBadge = (status) => {
-        return status === 'active' ? (
-            <span className="flex items-center text-green-600 text-sm">
-        <CheckCircle className="w-4 h-4 mr-1" />
-        Actif
-      </span>
-        ) : (
-            <span className="flex items-center text-gray-500 text-sm">
-        <UserX className="w-4 h-4 mr-1" />
-        Inactif
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleData.class}`}>
+        {roleData.label}
       </span>
         );
     };
 
-    const filteredUsers = users.filter(
-        user =>
-            user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const getStatusBadge = (user) => {
+        const isActive = user?.is_active === true || user?.status === 'active';
 
+        return isActive ? (
+            <span className="inline-flex items-center text-green-600 text-sm">
+            <CheckCircle className="w-4 h-4 mr-1" />
+            Actif
+        </span>
+        ) : (
+            <span className="inline-flex items-center text-gray-500 text-sm">
+            <UserX className="w-4 h-4 mr-1" />
+            Inactif
+        </span>
+        );
+    };
+
+    // Filter users
+    const filteredUsers = users.filter((user) => {
+        const q = searchTerm.toLowerCase();
+        return (
+            (user.email || '').toLowerCase().includes(q) ||
+            (user.full_name || '').toLowerCase().includes(q) ||
+            (user.username || '').toLowerCase().includes(q)
+        );
+    });
+
+    // Calculate stats
     const stats = {
         totalUsers: users.length,
-        activeUsers: users.filter((u) => u.is_active).length,
-        admins: users.filter((u) => u.role === "admin").length,
+        activeUsers: users.filter((u) => u.is_active === true || u.status === 'active').length,
+        admins: users.filter((u) => u.role?.toUpperCase() === 'ADMIN').length,
         departments: departments.length,
     };
-        if (loading) {
-            return <div className="p-6">Chargement...</div>;
-        }
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Chargement...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
+            {/* Alert */}
+            {alert && (
+                <div
+                    className={`p-4 rounded-lg border ${
+                        alert.type === 'error'
+                            ? 'bg-red-50 border-red-200 text-red-700'
+                            : 'bg-green-50 border-green-200 text-green-700'
+                    }`}
+                >
+                    <div className="flex items-center">
+                        {alert.type === 'error' ? (
+                            <AlertCircle className="w-5 h-5 mr-2" />
+                        ) : (
+                            <CheckCircle className="w-5 h-5 mr-2" />
+                        )}
+                        <span>{alert.message}</span>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Administration Système</h1>
-                    <p className="text-gray-600 mt-1">Gestion des utilisateurs, départements et configuration</p>
-                </div>
-                <div className="flex space-x-3">
-                    <button className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center">
-                        <Download className="w-4 h-4 mr-2" />
-                        Export
-                    </button>
-                    <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Import
-                    </button>
-                </div>
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">Administration Système</h1>
+                <p className="text-gray-600 mt-1">
+                    Gestion des utilisateurs, départements et configuration
+                </p>
             </div>
 
             {/* Stats Cards */}
@@ -235,10 +366,10 @@ const SystemAdmin = () => {
                 </div>
             </div>
 
-            {/* Gestion Utilisateurs */}
+            {/* Users Tab */}
             {activeTab === 'users' && (
                 <div className="space-y-4">
-                    {/* Barre d'actions */}
+                    {/* Action bar */}
                     <div className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
                         <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -251,7 +382,10 @@ const SystemAdmin = () => {
                             />
                         </div>
                         <button
-                            onClick={() => setShowUserModal(true)}
+                            onClick={() => {
+                                setSelectedUser(null);
+                                setShowUserModal(true);
+                            }}
                             className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center ml-4"
                         >
                             <Plus className="w-4 h-4 mr-2" />
@@ -259,97 +393,117 @@ const SystemAdmin = () => {
                         </button>
                     </div>
 
-                    {/* Table Utilisateurs */}
+                    {/* Users Table */}
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Utilisateur</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Département</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière Connexion</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    Utilisateur
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    Email
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    Rôle
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    Département
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    Statut
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                    Actions
+                                </th>
                             </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredUsers.map((user) => (
-                                <tr key={user.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div>
-                                            <div className="font-medium text-gray-900">{user.full_name}</div>
-                                            <div className="text-sm text-gray-500">@{user.username}</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {user.email}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {getRoleBadge(user.role)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {user.department.name}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {getStatusBadge(user.status)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {user.last_login}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
-                                            <button
-                                                onClick={() => setSelectedUser(user)}
-                                                className="text-cyan-600 hover:text-cyan-900"
-                                                title="Modifier"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                className="text-amber-600 hover:text-amber-900"
-                                                title="Réinitialiser mot de passe"
-                                            >
-                                                <Key className="w-4 h-4" />
-                                            </button>
-                                            {user.status === 'active' ? (
-                                                <button
-                                                    className="text-red-600 hover:text-red-900"
-                                                    title="Désactiver"
-                                                >
-                                                    <UserX className="w-4 h-4" />
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    className="text-green-600 hover:text-green-900"
-                                                    title="Activer"
-                                                >
-                                                    <UserCheck className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            <button
-                                                className="text-red-600 hover:text-red-900"
-                                                title="Supprimer"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                            {filteredUsers.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                        Aucun utilisateur trouvé
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                filteredUsers.map((user) => (
+                                    <tr key={user.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="font-medium text-gray-900">
+                                                {user.full_name || '-'}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {user.email || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {getRoleBadge(user.role)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {user.department?.name || user.department_name || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {getStatusBadge(user)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex justify-end space-x-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedUser(user);
+                                                        setShowUserModal(true);
+                                                    }}
+                                                    className="text-cyan-600 hover:text-cyan-900"
+                                                    title="Modifier"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleUser(user)}
+                                                    className={
+                                                        user.is_active === true || user.status === 'active'
+                                                            ? 'text-red-600 hover:text-red-900'
+                                                            : 'text-green-600 hover:text-green-900'
+                                                    }
+                                                    title={
+                                                        user.is_active === true || user.status === 'active'
+                                                            ? 'Désactiver'
+                                                            : 'Activer'
+                                                    }
+                                                >
+                                                    {user.is_active === true || user.status === 'active' ? (
+                                                        <UserX className="w-4 h-4" />
+                                                    ) : (
+                                                        <UserCheck className="w-4 h-4" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    className="text-red-600 hover:text-red-900"
+                                                    title="Supprimer"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             )}
 
-            {/* Gestion Départements */}
+            {/* Departments Tab */}
             {activeTab === 'departments' && (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-xl font-bold text-gray-900">Liste des Départements</h2>
                         <button
-                            onClick={() => setShowDeptModal(true)}
+                            onClick={() => {
+                                setSelectedDept(null);
+                                setShowDeptModal(true);
+                            }}
                             className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center"
                         >
                             <Plus className="w-4 h-4 mr-2" />
@@ -357,138 +511,112 @@ const SystemAdmin = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {departments.map((dept) => (
-                            <div key={dept.id} className="bg-white rounded-lg shadow p-6">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-900">{dept.name}</h3>
-                                        <p className="text-sm text-gray-500">{dept.code}</p>
-                                    </div>
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        dept.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                    {dept.active ? 'Actif' : 'Inactif'}
-                  </span>
-                                </div>
+                    {departments.length === 0 ? (
+                        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                            Aucun département trouvé
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {departments.map((dept) => {
+                                const isActive =
+                                    typeof dept.is_active === 'boolean'
+                                        ? dept.is_active
+                                        : !!dept.active;
 
-                                <div className="space-y-2 mb-4">
-                                    <div className="flex items-center text-sm text-gray-600">
-                                        <Users className="w-4 h-4 mr-2" />
-                                        <span>{dept.users_count} utilisateurs</span>
-                                    </div>
-                                    <div className="flex items-center text-sm text-gray-600">
-                                        <UserCheck className="w-4 h-4 mr-2" />
-                                        <span>Responsable: {dept.responsible}</span>
-                                    </div>
-                                </div>
+                                return (
+                                    <div key={dept.id} className="bg-white rounded-lg shadow p-6">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 className="text-lg font-bold text-gray-900">{dept.name}</h3>
+                                                <p className="text-sm text-gray-500">{dept.code}</p>
+                                            </div>
+                                            <span
+                                                className={`px-2 py-1 rounded text-xs font-medium ${
+                                                    isActive
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-gray-100 text-gray-800'
+                                                }`}
+                                            >
+                                                {isActive ? 'Actif' : 'Inactif'}
+                                            </span>
+                                        </div>
 
-                                <div className="flex space-x-2">
-                                    <button className="flex-1 px-3 py-2 bg-cyan-50 text-cyan-600 rounded-lg text-sm hover:bg-cyan-100">
-                                        <Edit2 className="w-4 h-4 inline mr-1" />
-                                        Modifier
-                                    </button>
-                                    <button className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                        <div className="space-y-2 mb-4">
+                                            <div className="flex items-center text-sm text-gray-600">
+                                                <Users className="w-4 h-4 mr-2" />
+                                                <span>
+                                                    {dept.users_count ?? dept.total_users ?? 0} utilisateurs
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center text-sm text-gray-600">
+                                                <UserCheck className="w-4 h-4 mr-2" />
+                                                <span>
+                                                     Responsable: {dept.responsible || dept.manager_name || "Non défini"}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {dept.description && (
+                                            <p className="text-sm text-gray-600 mb-4">{dept.description}</p>
+                                        )}
+
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDept(dept);
+                                                    setShowDeptModal(true);
+                                                }}
+                                                className="flex-1 px-3 py-2 bg-cyan-50 text-cyan-600 rounded-lg text-sm hover:bg-cyan-100"
+                                            >
+                                                <Edit2 className="w-4 h-4 inline mr-1" />
+                                                Modifier
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteDepartment(dept.id)}
+                                                className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Configuration Système */}
+            {/* Settings Tab */}
             {activeTab === 'settings' && (
                 <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">Configuration Système</h2>
-
-                    <div className="space-y-6">
-                        {/* Email Configuration */}
-                        <div className="border-b border-gray-200 pb-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuration Email</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Serveur SMTP</label>
-                                    <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="smtp.batex-ci.com" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Port</label>
-                                    <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="587" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Expéditeur</label>
-                                    <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="noreply@batex-ci.com" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom Expéditeur</label>
-                                    <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="BATEX-CI Reporting" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Rappels Automatiques */}
-                        <div className="border-b border-gray-200 pb-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Rappels Automatiques</h3>
-                            <div className="space-y-3">
-                                <label className="flex items-center">
-                                    <input type="checkbox" className="rounded text-cyan-600" defaultChecked />
-                                    <span className="ml-2 text-sm text-gray-700">Rappels hebdomadaires (Vendredis 9h)</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input type="checkbox" className="rounded text-cyan-600" defaultChecked />
-                                    <span className="ml-2 text-sm text-gray-700">Rappels mensuels (28 du mois 9h)</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input type="checkbox" className="rounded text-cyan-600" />
-                                    <span className="ml-2 text-sm text-gray-700">Notifications validateurs (temps réel)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Backup */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sauvegarde & Maintenance</h3>
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p className="font-medium text-gray-900">Dernière sauvegarde</p>
-                                        <p className="text-sm text-gray-500">16/02/2026 03:00</p>
-                                    </div>
-                                    <button className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
-                                        <Download className="w-4 h-4 inline mr-2" />
-                                        Backup Now
-                                    </button>
-                                </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p className="font-medium text-gray-900">Nettoyage base de données</p>
-                                        <p className="text-sm text-gray-500">Supprimer les données anciennes</p>
-                                    </div>
-                                    <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-                                        <RefreshCw className="w-4 h-4 inline mr-2" />
-                                        Nettoyer
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg">
-                                Sauvegarder Configuration
-                            </button>
-                        </div>
-                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">
+                        Configuration Système
+                    </h2>
+                    <p className="text-gray-600">Fonctionnalités à venir...</p>
                 </div>
             )}
 
-            {/* Alert succès */}
-            <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden" id="successAlert">
-                <div className="flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    <span>Opération effectuée avec succès</span>
-                </div>
-            </div>
+            {/* Modals */}
+            <UserModal
+                show={showUserModal}
+                onClose={() => {
+                    setShowUserModal(false);
+                    setSelectedUser(null);
+                }}
+                user={selectedUser}
+                departments={departments}
+                onSuccess={selectedUser ? handleUpdateUser : handleCreateUser}
+            />
+
+            <DepartmentModal
+                show={showDeptModal}
+                onClose={() => {
+                    setShowDeptModal(false);
+                    setSelectedDept(null);
+                }}
+                department={selectedDept}
+                onSuccess={selectedDept ? handleUpdateDepartment : handleCreateDepartment}
+            />
         </div>
     );
 };

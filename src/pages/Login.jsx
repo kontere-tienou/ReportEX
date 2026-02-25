@@ -5,7 +5,7 @@ import { Building2, Lock, User, AlertCircle } from 'lucide-react';
 import { branding } from '../config/brandingConstant.js';
 
 const Login = () => {
-    const [credentials, setCredentials] = useState({ username: '', password: '' });
+    const [credentials, setCredentials] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
@@ -19,19 +19,23 @@ const Login = () => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
-        const result = await login(credentials);
-        console.log("Credentials envoyés :", credentials);
-
+        const payload = {
+            email: credentials.email.trim(),
+            password: credentials.password,
+        };
+        console.log("Credentials envoyés :", {
+            email: payload.email,
+            password: JSON.stringify(payload.password),
+            length: payload.password.length,
+        });
+        const result = await login(payload);
         if (result.success) {
             navigate('/dashboard');
         } else {
             setError(result.message);
         }
-
         setLoading(false);
     };
-
     return (
         <div className="min-h-screen bg-gradient-to-br flex items-center justify-center p-4" style={backgroundStyle}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -58,11 +62,11 @@ const Login = () => {
                             Nom d'utilisateur
                         </label>
                         <input
-                            type="text"
+                            type="email"
                             className="input-field"
                             placeholder="Entrez votre nom d'utilisateur"
-                            value={credentials.username}
-                            onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                            value={credentials.email}
+                            onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                             required
                         />
                     </div>

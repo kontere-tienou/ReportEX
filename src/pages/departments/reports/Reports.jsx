@@ -35,9 +35,10 @@ export default function Reports() {
     const { deptName } = useParams();
     const { user } = useAuth();
 
+
     const isDirection = useMemo(() => {
         // adapte selon ton backend: role = 'direction' ou department_id = 11 etc
-        return user?.role === "direction" || user?.department_id === 11 || user?.department?.id === 11;
+        return user?.role === "DG" || user?.department_id === 1 || user?.department?.id === 1;
     }, [user]);
 
     const [reports, setReports] = useState([]);
@@ -61,13 +62,15 @@ export default function Reports() {
                 ? await reportService.getAllReports(params)
                 : await reportService.getMyReports(params);
 
-            setReports(res.data.reports || []);
+            const payload = res.data?.data || res.data;
+            setReports(payload.reports || []);
         } catch (e) {
             console.error("Erreur chargement rapports:", e);
         } finally {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         loadReports();
@@ -233,7 +236,7 @@ export default function Reports() {
                             <div className="flex justify-end">
                                 <div className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
                                     <User2 className="w-4 h-4 mr-1" />
-                                    by {user.rejete}
+                                    by {reports.author_name || '-'}
                                 </div>
                                 <div className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
                                     <Eye className="w-4 h-4 mr-1" />

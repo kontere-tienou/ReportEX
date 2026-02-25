@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { reportService } from '../../services/api';
+import { useAuth } from '../../../context/AuthContext.jsx';
+import { reportService } from '../../../services/api.js';
 import {
     Server, AlertCircle, CheckCircle, Clock, TrendingUp,
     Cpu, HardDrive, Monitor, Wifi, Database

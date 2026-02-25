@@ -4,7 +4,7 @@ import {
     Check, Search, Settings, Mail, Eye
 } from 'lucide-react';
 
-const NotificationsIT = () => {
+const Notifications = () => {
     const [filterType, setFilterType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +47,7 @@ const NotificationsIT = () => {
             id: 4,
             type: 'report',
             severity: 'info',
-            title: 'Rapport validé',
+            title: 'Rapport 200000000000000000002validé',
             message: 'Votre rapport hebdomadaire IT a été validé',
             from: 'Direction',
             timestamp: '2026-02-16 11:20',
@@ -280,4 +280,4 @@ const NotificationsIT = () => {
     );
 };
 
-export default NotificationsIT;
+export default Notifications;

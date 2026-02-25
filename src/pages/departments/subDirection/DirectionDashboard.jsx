@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { reportService } from '../../services/api';
+import { useAuth } from '../../../context/AuthContext.jsx';
+import { reportService } from '../../../services/api.js';
 import {
     BarChart3, TrendingUp, Users, Building2, CheckCircle, AlertCircle, Clock
 } from 'lucide-react';
