@@ -16,15 +16,15 @@ const SystemsMonitoring = () => {
             type: 'Application Server',
             status: 'operational',
             ip: '192.168.1.10',
-            location: 'Datacenter A',
-            uptime: '99.98%',
-            lastReboot: '45 jours',
+            location: 'Datacenter',
+            uptime: '0%',
+            lastReboot: '0 jours',
             metrics: {
-                cpu: 45,
-                ram: 62,
-                disk: 58,
-                network: 35,
-                temperature: 48
+                cpu: 0,
+                ram: 0,
+                disk: 0,
+                network: 0,
+                temperature: 0
             },
             services: [
                 { name: 'Apache', status: 'running', port: 80 },
@@ -32,12 +32,12 @@ const SystemsMonitoring = () => {
                 { name: 'PHP-FPM', status: 'running', port: 9000 }
             ],
             history: [
-                { time: '00:00', cpu: 32, ram: 58 },
-                { time: '04:00', cpu: 28, ram: 55 },
-                { time: '08:00', cpu: 52, ram: 64 },
-                { time: '12:00', cpu: 48, ram: 62 },
-                { time: '16:00', cpu: 55, ram: 66 },
-                { time: '20:00', cpu: 42, ram: 60 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
             ]
         },
         {
@@ -47,26 +47,26 @@ const SystemsMonitoring = () => {
             status: 'operational',
             ip: '192.168.1.11',
             location: 'Datacenter A',
-            uptime: '99.95%',
-            lastReboot: '32 jours',
+            uptime: '0%',
+            lastReboot: '0 jours',
             metrics: {
-                cpu: 32,
-                ram: 48,
-                disk: 71,
-                network: 28,
-                temperature: 44
+                cpu: 0,
+                ram: 0,
+                disk: 0,
+                network: 0,
+                temperature: 0
             },
             services: [
                 { name: 'Bacula', status: 'running', port: 9101 },
                 { name: 'rsync', status: 'running', port: 873 }
             ],
             history: [
-                { time: '00:00', cpu: 25, ram: 45 },
-                { time: '04:00', cpu: 35, ram: 52 },
-                { time: '08:00', cpu: 28, ram: 46 },
-                { time: '12:00', cpu: 32, ram: 48 },
-                { time: '16:00', cpu: 38, ram: 50 },
-                { time: '20:00', cpu: 30, ram: 47 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
             ]
         },
         {
@@ -76,14 +76,14 @@ const SystemsMonitoring = () => {
             status: 'warning',
             ip: '192.168.1.1',
             location: 'DMZ',
-            uptime: '98.20%',
-            lastReboot: '12 jours',
+            uptime: '0%',
+            lastReboot: '0 jours',
             metrics: {
-                cpu: 78,
-                ram: 85,
-                disk: 45,
-                network: 92,
-                temperature: 62
+                cpu: 0,
+                ram: 0,
+                disk: 0,
+                network: 0,
+                temperature: 0
             },
             services: [
                 { name: 'iptables', status: 'running', port: null },
@@ -91,12 +91,12 @@ const SystemsMonitoring = () => {
                 { name: 'snort', status: 'warning', port: null }
             ],
             history: [
-                { time: '00:00', cpu: 65, ram: 78 },
-                { time: '04:00', cpu: 58, ram: 75 },
-                { time: '08:00', cpu: 82, ram: 88 },
-                { time: '12:00', cpu: 78, ram: 85 },
-                { time: '16:00', cpu: 75, ram: 82 },
-                { time: '20:00', cpu: 70, ram: 80 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
             ]
         },
         {
@@ -106,26 +106,26 @@ const SystemsMonitoring = () => {
             status: 'operational',
             ip: '192.168.1.12',
             location: 'Datacenter B',
-            uptime: '100%',
-            lastReboot: '78 jours',
+            uptime: '0%',
+            lastReboot: '0 jours',
             metrics: {
-                cpu: 25,
-                ram: 35,
-                disk: 89,
-                network: 45,
-                temperature: 42
+                cpu: 0,
+                ram: 0,
+                disk: 0,
+                network: 0,
+                temperature: 0
             },
             services: [
                 { name: 'PostgreSQL', status: 'running', port: 5432 },
                 { name: 'Redis', status: 'running', port: 6379 }
             ],
             history: [
-                { time: '00:00', cpu: 22, ram: 32 },
-                { time: '04:00', cpu: 18, ram: 30 },
-                { time: '08:00', cpu: 28, ram: 38 },
-                { time: '12:00', cpu: 25, ram: 35 },
-                { time: '16:00', cpu: 30, ram: 40 },
-                { time: '20:00', cpu: 24, ram: 34 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
+                { time: '00:00', cpu: 0, ram: 0 },
             ]
         },
     ];
@@ -185,7 +185,43 @@ const SystemsMonitoring = () => {
                 </div>
             </div>
 
-            {/* Stats Overview */}
+            {/* Network Overview */}
+            <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <Wifi className="w-5 h-5 mr-2 text-cyan-600" />
+                    Vue Réseau
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-green-700">Latence</span>
+                            <Activity className="w-4 h-4 text-green-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-green-600">12ms</p>
+                        <p className="text-xs text-green-600 mt-1">Excellent</p>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-blue-700">Bande passante</span>
+                            <TrendingUp className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-blue-600">95 Mbps</p>
+                        <p className="text-xs text-blue-600 mt-1">Disponible</p>
+                    </div>
+
+                    <div className="p-4 bg-purple-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-purple-700">Connexions actives</span>
+                            <Zap className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-purple-600">1,245</p>
+                        <p className="text-xs text-purple-600 mt-1">Sessions</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stats Overview
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center justify-between">
@@ -238,7 +274,7 @@ const SystemsMonitoring = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>*/}
 
             {/* Systems Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -382,41 +418,7 @@ const SystemsMonitoring = () => {
                 </div>
             )}
 
-            {/* Network Overview */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                    <Wifi className="w-5 h-5 mr-2 text-cyan-600" />
-                    Vue Réseau
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-green-700">Latence</span>
-                            <Activity className="w-4 h-4 text-green-600" />
-                        </div>
-                        <p className="text-2xl font-bold text-green-600">12ms</p>
-                        <p className="text-xs text-green-600 mt-1">Excellent</p>
-                    </div>
 
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-blue-700">Bande passante</span>
-                            <TrendingUp className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <p className="text-2xl font-bold text-blue-600">95 Mbps</p>
-                        <p className="text-xs text-blue-600 mt-1">Disponible</p>
-                    </div>
-
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-purple-700">Connexions actives</span>
-                            <Zap className="w-4 h-4 text-purple-600" />
-                        </div>
-                        <p className="text-2xl font-bold text-purple-600">1,245</p>
-                        <p className="text-xs text-purple-600 mt-1">Sessions</p>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };

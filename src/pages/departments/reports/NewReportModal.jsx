@@ -3,7 +3,7 @@ import { X, Calendar, Save, Send, AlertCircle, FileText, Lock, Globe } from 'luc
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { reportService } from '../../../services/api';
 import { useToast, ToastContainer } from '../../../components/ui/Toast';
-import ReportFieldRenderer from './ ReportFieldRenderer.jsx';
+import ReportFieldRenderer from './ReportFieldRenderer.jsx';
 import {
     getTemplateForDepartment,
     validateReportData,
@@ -12,7 +12,7 @@ import {
 
 /**
  * ==========================================
- * NEW REPORT MODAL - DYNAMIC BASED ON DEPARTMENT
+ * NEW REPORT MODAL - FIXED
  * ==========================================
  */
 
@@ -34,7 +34,7 @@ const VISIBILITY_OPTIONS = [
     {
         value: 'public',
         label: 'Public',
-        description: 'Accès sur autorisation',
+        description: 'Tous les utilisateurs',
         icon: Globe,
         color: 'text-green-600',
     },
@@ -47,7 +47,7 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
     const [formData, setFormData] = useState({
         period_start: '',
         period_end: '',
-        visibility: 'private',
+        visibility: 'private', // STRING pas array
     });
 
     const [reportData, setReportData] = useState({});
@@ -134,7 +134,6 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
             const validation = validateReportData(user.department.code, reportData);
             if (!validation.valid) {
                 validation.errors.forEach((error) => {
-                    // Map error message to field key
                     const field = template.fields.find((f) => error.includes(f.label));
                     if (field) {
                         newErrors[field.key] = error;
@@ -158,7 +157,6 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
         setSaving(true);
 
         try {
-            // Calculate final data with derived fields
             const finalData = calculateDerivedFields(
                 user.department.code,
                 reportData
@@ -167,7 +165,7 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
             const payload = {
                 period_start: formData.period_start,
                 period_end: formData.period_end,
-                visibility: formData.visibility,
+                visibility: formData.visibility, // STRING
                 data: finalData,
             };
 
@@ -198,7 +196,6 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
             [fieldKey]: value,
         });
 
-        // Clear error for this field
         if (errors[fieldKey]) {
             setErrors({
                 ...errors,
@@ -256,7 +253,7 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
                                 </div>
                             </div>
 
-                            {/* Visibility */}
+                            {/* Visibility - SINGLE SELECT */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-900 mb-3">
                                     Visibilité du Rapport
@@ -273,14 +270,11 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
                                                 onClick={() =>
                                                     setFormData({ ...formData, visibility: v.value })
                                                 }
-                                                className={`
-                          relative p-4 rounded-xl border-2 transition-all
-                          ${
+                                                className={`relative p-4 rounded-xl border-2 transition-all ${
                                                     isSelected
                                                         ? 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-200'
                                                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                                }
-                        `}
+                                                }`}
                                             >
                                                 <div className="flex items-start space-x-3">
                                                     <Icon
@@ -432,31 +426,31 @@ const NewReportModal = ({ open, onClose, onCreated }) => {
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 
             <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes scale-in {
-          from {
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-          }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.2s ease-out;
-        }
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out;
-        }
-      `}</style>
+                @keyframes fade-in {
+                    from {
+                        opacity: 0;
+                    }
+                    to {
+                        opacity: 1;
+                    }
+                }
+                @keyframes scale-in {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -50%) scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, -50%) scale(1);
+                    }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.2s ease-out;
+                }
+                .animate-scale-in {
+                    animation: scale-in 0.3s ease-out;
+                }
+            `}</style>
         </>
     );
 };

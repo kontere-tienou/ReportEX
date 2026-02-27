@@ -1,9 +1,3 @@
-/**
- * ==========================================
- * DEPARTMENT REPORT TEMPLATES
- * Configuration des modèles de rapports par département
- * ==========================================
- */
 
 export const DEPARTMENT_REPORT_TEMPLATES = {
     // 1. Direction Générale

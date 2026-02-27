@@ -1,13 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { reportService } from '../../../services/api.js';
-import { useAuth } from '../../../context/AuthContext';
-import { useToast, ToastContainer } from '../../../components/ui/Toast';
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { reportService, reportAccessService } from "../../../services/api.js";
+import { useAuth } from "../../../context/AuthContext";
+import { useToast, ToastContainer } from "../../../components/ui/Toast";
+import { getTemplateForDepartment } from "../../../config/reportTemplates";
 import {
-    ArrowLeft, Calendar, User, Eye, Edit2, Trash2,
-    Send, CheckCircle, XCircle, Clock, AlertCircle, FileText,
-    MessageSquare, Activity, Download, Share2, Printer
-} from 'lucide-react';
+    ArrowLeft,
+    Calendar,
+    User,
+    Eye,
+    Edit2,
+    Trash2,
+    Send,
+    CheckCircle,
+    XCircle,
+    Clock,
+    AlertCircle,
+    FileText,
+    MessageSquare,
+    Download,
+    Printer,
+    Lock,
+    Shield,
+} from "lucide-react";
+
+/**
+ * ==========================================
+ * REPORT DETAILS - WITH STRICT ACCESS CONTROL
+ * ==========================================
+ */
 
 const ReportDetails = () => {
     const { id } = useParams();
@@ -16,53 +37,119 @@ const ReportDetails = () => {
     const { toasts, addToast, removeToast } = useToast();
 
     const [report, setReport] = useState(null);
+    const [permissions, setPermissions] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [accessDenied, setAccessDenied] = useState(false);
+    const [needsAccessRequest, setNeedsAccessRequest] = useState(false);
 
+    // Access request state
+    const [showAccessModal, setShowAccessModal] = useState(false);
+    const [accessReason, setAccessReason] = useState("");
+    const [requestingAccess, setRequestingAccess] = useState(false);
+
+    // Validation modal
     const [showValidateModal, setShowValidateModal] = useState(false);
-    const [validationStatus, setValidationStatus] = useState('valide');
-    const [validationComments, setValidationComments] = useState('');
+    const [validationStatus, setValidationStatus] = useState("valide");
+    const [validationComments, setValidationComments] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    // NEW: commentaires / lecteurs / annotations
+    // Comments
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState('');
-    const [commentsLoading, setCommentsLoading] = useState(false);
+    const [newComment, setNewComment] = useState("");
 
+    // Readers
     const [readers, setReaders] = useState([]);
-    const [readersLoading, setReadersLoading] = useState(false);
 
+    // Annotations
     const [annotations, setAnnotations] = useState([]);
-    const [selectedText, setSelectedText] = useState('');
-    const [selectionRange, setSelectionRange] = useState(null);
-    const [annotationComment, setAnnotationComment] = useState('');
-    const [showAnnotationBox, setShowAnnotationBox] = useState(false);
 
-    const roleLower = (user?.role || '').toLowerCase();
-    const canAnnotate = ['dg', 'direction', 'admin', 'validateur'].includes(roleLower);
+    // Check if user can access report
+    const checkAccess = (reportData) => {
+        if (!reportData || !user) return false;
 
-    useEffect(() => {
-        loadReport();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
+        const isOwner = reportData.user_id === user.id;
+        const isDG = ["DG", "ADMIN"].includes(user?.role?.toUpperCase());
+        const sameDept = reportData.department_id === user.department_id;
+        const isPublic = reportData.visibility === "public";
+        const isDepartment = reportData.visibility === "department";
+        const isPrivate = reportData.visibility === "private";
 
-    useEffect(() => {
-        if (!report?.id) return;
-        markAsRead();
-        loadComments();
-        loadReaders();
-        setAnnotations(Array.isArray(report.annotations) ? report.annotations : []);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [report?.id]);
+        // Owner and DG can always access
+        if (isOwner || isDG) return true;
 
+        // Public reports accessible to all
+        if (isPublic) return true;
+
+        // Department reports accessible to same department
+        if (isDepartment && sameDept) return true;
+
+        // Private reports - need to request access
+        if (isPrivate) {
+            // Check if access has been granted (this should be in permissions from backend)
+            return false;
+        }
+
+        return false;
+    };
+
+    // Load report
     const loadReport = async () => {
         try {
             setLoading(true);
             const res = await reportService.getReportDetails(id);
-            setReport(res.data?.report || null);
+
+            const reportData = res.data?.report || res.data?.data?.report || null;
+            const perms = res.data?.permissions || res.data?.data?.permissions || null;
+
+            // Check if user can access this report
+            const canAccess = checkAccess(reportData);
+
+            if (!canAccess && !perms?.canRead) {
+                // Check if it's a private report that needs access request
+                if (reportData?.visibility === "private") {
+                    setNeedsAccessRequest(true);
+                    setReport(reportData); // Set minimal report data for display
+                    setLoading(false);
+                    return;
+                } else {
+                    // Complete access denied
+                    setAccessDenied(true);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            setReport(reportData);
+            setPermissions(perms);
+
+            if (reportData?.annotations) {
+                setAnnotations(
+                    Array.isArray(reportData.annotations) ? reportData.annotations : []
+                );
+            }
         } catch (error) {
-            console.error('Erreur chargement rapport:', error);
-            addToast(error.response?.data?.message || 'Erreur lors du chargement du rapport', 'error');
-            navigate('/reports');
+            console.error("Erreur chargement rapport:", error);
+
+            // Handle 403 Forbidden
+            if (error.response?.status === 403) {
+                const errorData = error.response?.data;
+
+                if (errorData?.needsAccessRequest) {
+                    setNeedsAccessRequest(true);
+                    // Try to get minimal report info
+                    setReport({ id });
+                } else {
+                    setAccessDenied(true);
+                }
+                setLoading(false);
+                return;
+            }
+
+            addToast(
+                error.response?.data?.message || "Erreur lors du chargement du rapport",
+                "error"
+            );
+            navigate("/reports");
         } finally {
             setLoading(false);
         }
@@ -70,25 +157,19 @@ const ReportDetails = () => {
 
     const loadComments = async () => {
         try {
-            setCommentsLoading(true);
             const res = await reportService.getReportComments(id);
-            setComments(res.data?.comments || []);
+            setComments(res.data?.comments || res.data?.data?.comments || []);
         } catch (error) {
-            console.error('Erreur chargement commentaires:', error);
-        } finally {
-            setCommentsLoading(false);
+            console.error("Erreur chargement commentaires:", error);
         }
     };
 
     const loadReaders = async () => {
         try {
-            setReadersLoading(true);
             const res = await reportService.getReportReaders(id);
-            setReaders(res.data?.readers || []);
+            setReaders(res.data?.readers || res.data?.data?.readers || []);
         } catch (error) {
-            console.error('Erreur chargement lecteurs:', error);
-        } finally {
-            setReadersLoading(false);
+            console.error("Erreur chargement lecteurs:", error);
         }
     };
 
@@ -96,26 +177,77 @@ const ReportDetails = () => {
         try {
             await reportService.markReportAsRead(id);
         } catch (error) {
-            console.error('Erreur marquage lecture:', error);
+            console.error("Erreur marquage lecture:", error);
         }
     };
 
+    useEffect(() => {
+        loadReport();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
+
+    useEffect(() => {
+        if (!report?.id || !permissions?.canRead) return;
+
+        markAsRead();
+        loadComments();
+        loadReaders();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [report?.id, permissions?.canRead]);
+
+    // Request access
+    const handleRequestAccess = async () => {
+        if (!accessReason.trim()) {
+            addToast("Veuillez indiquer la raison de votre demande", "warning");
+            return;
+        }
+
+        setRequestingAccess(true);
+
+        try {
+            await reportAccessService.requestAccess(id, accessReason.trim());
+            addToast(
+                "Demande d'accès envoyée avec succès. Vous serez notifié une fois traitée.",
+                "success"
+            );
+            setShowAccessModal(false);
+            setAccessReason("");
+
+            // Redirect back to reports after 2 seconds
+            setTimeout(() => {
+                navigate("/reports");
+            }, 2000);
+        } catch (error) {
+            addToast(
+                error.response?.data?.message || "Erreur lors de la demande d'accès",
+                "error"
+            );
+        } finally {
+            setRequestingAccess(false);
+        }
+    };
+
+    // Submit report
     const handleSubmit = async () => {
         try {
             setSubmitting(true);
             await reportService.submitReport(id);
-            addToast('Rapport soumis pour validation', 'success');
+            addToast("Rapport soumis pour validation", "success");
             await loadReport();
         } catch (error) {
-            addToast(error.response?.data?.message || 'Erreur lors de la soumission', 'error');
+            addToast(
+                error.response?.data?.message || "Erreur lors de la soumission",
+                "error"
+            );
         } finally {
             setSubmitting(false);
         }
     };
 
+    // Validate report
     const handleValidate = async () => {
-        if (!validationComments.trim() && validationStatus === 'rejete') {
-            addToast('Veuillez indiquer la raison du rejet', 'warning');
+        if (!validationComments.trim() && validationStatus === "rejete") {
+            addToast("Veuillez indiquer la raison du rejet", "warning");
             return;
         }
 
@@ -123,139 +255,120 @@ const ReportDetails = () => {
             setSubmitting(true);
             await reportService.validateReport(id, {
                 status: validationStatus,
-                comments: validationComments
+                comments: validationComments,
             });
 
             addToast(
-                validationStatus === 'valide'
-                    ? 'Rapport validé avec succès'
-                    : 'Rapport rejeté',
-                validationStatus === 'valide' ? 'success' : 'warning'
+                validationStatus === "valide"
+                    ? "Rapport validé avec succès"
+                    : "Rapport rejeté",
+                validationStatus === "valide" ? "success" : "warning"
             );
 
             setShowValidateModal(false);
-            setValidationComments('');
-            setValidationStatus('valide');
+            setValidationComments("");
+            setValidationStatus("valide");
             await loadReport();
         } catch (error) {
-            addToast(error.response?.data?.message || 'Erreur lors de la validation', 'error');
+            addToast(
+                error.response?.data?.message || "Erreur lors de la validation",
+                "error"
+            );
         } finally {
             setSubmitting(false);
         }
     };
 
+    // Delete report
     const handleDelete = async () => {
-        if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce rapport ?')) return;
+        if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce rapport ?"))
+            return;
 
         try {
             await reportService.deleteReport(id);
-            addToast('Rapport supprimé', 'success');
-            navigate('/reports');
+            addToast("Rapport supprimé", "success");
+            navigate("/reports");
         } catch (error) {
-            addToast(error.response?.data?.message || 'Erreur lors de la suppression', 'error');
+            addToast(
+                error.response?.data?.message || "Erreur lors de la suppression",
+                "error"
+            );
         }
     };
 
+    // Add comment
     const handleAddComment = async () => {
         if (!newComment.trim()) return;
 
         try {
             await reportService.addReportComment(id, { content: newComment.trim() });
-            setNewComment('');
-            addToast('Commentaire ajouté', 'success');
+            setNewComment("");
+            addToast("Commentaire ajouté", "success");
             await loadComments();
         } catch (error) {
-            addToast(error.response?.data?.message || 'Erreur ajout commentaire', 'error');
+            addToast(
+                error.response?.data?.message || "Erreur ajout commentaire",
+                "error"
+            );
         }
     };
 
-    const handleTextSelection = () => {
-        if (!canAnnotate) return;
-
-        const selection = window.getSelection();
-        const text = selection?.toString()?.trim();
-
-        if (!text) {
-            setShowAnnotationBox(false);
-            return;
-        }
-
-        setSelectedText(text);
-        setSelectionRange({
-            text,
-            anchorOffset: selection.anchorOffset,
-            focusOffset: selection.focusOffset,
-        });
-        setShowAnnotationBox(true);
-    };
-
-    const handleAddAnnotation = async (decision = null) => {
-        if (!selectedText.trim()) return;
-
-        try {
-            await reportService.addReportAnnotation(id, {
-                selected_text: selectedText,
-                comment: annotationComment.trim() || null,
-                decision, // null | 'valide' | 'rejete'
-                range_meta: selectionRange,
-            });
-
-            addToast('Annotation enregistrée', 'success');
-            setSelectedText('');
-            setAnnotationComment('');
-            setSelectionRange(null);
-            setShowAnnotationBox(false);
-            await loadReport();
-        } catch (error) {
-            addToast(error.response?.data?.message || 'Erreur annotation', 'error');
-        }
-    };
-
+    // Export PDF
     const handleExportPdf = async () => {
         try {
-            const res = await reportService.exportReportPdf(id);
-            const blob = new Blob([res.data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `rapport-${id}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
+            addToast("Export PDF en cours...", "info");
+            // TODO: Implement PDF export
         } catch (error) {
-            console.error(error);
-            addToast('Erreur export PDF', 'error');
+            addToast("Erreur export PDF", "error");
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
-
+    // Status badge
     const getStatusBadge = (status) => {
         const badges = {
-            brouillon: { bg: 'bg-gray-100', text: 'text-gray-800', icon: Clock, label: 'Brouillon' },
-            soumis: { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'Soumis' },
-            valide: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Validé' },
-            rejete: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'Rejeté' }
+            brouillon: {
+                bg: "bg-gray-100",
+                text: "text-gray-800",
+                icon: Clock,
+                label: "Brouillon",
+            },
+            soumis: {
+                bg: "bg-blue-100",
+                text: "text-blue-800",
+                icon: AlertCircle,
+                label: "Soumis",
+            },
+            valide: {
+                bg: "bg-green-100",
+                text: "text-green-800",
+                icon: CheckCircle,
+                label: "Validé",
+            },
+            rejete: {
+                bg: "bg-red-100",
+                text: "text-red-800",
+                icon: XCircle,
+                label: "Rejeté",
+            },
         };
         const badge = badges[status] || badges.brouillon;
         const Icon = badge.icon;
 
         return (
-            <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badge.bg} ${badge.text}`}>
-                <Icon className="w-5 h-5 mr-2" />
+            <span
+                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badge.bg} ${badge.text}`}
+            >
+        <Icon className="w-5 h-5 mr-2" />
                 {badge.label}
-            </span>
+      </span>
         );
     };
 
-    // Parse report.data sécurisé
+    // Parse report data
     const reportData = useMemo(() => {
         if (!report) return {};
         try {
-            if (typeof report.data === 'string') {
+            if (typeof report.data === "string") {
                 return JSON.parse(report.data);
             }
             return report.data || {};
@@ -264,6 +377,95 @@ const ReportDetails = () => {
         }
     }, [report]);
 
+    // Get template for display
+    const template = useMemo(() => {
+        if (!report?.department_code) return null;
+        return getTemplateForDepartment(report.department_code);
+    }, [report]);
+
+    // Render field value based on type
+    const renderFieldValue = (field, value) => {
+        if (value === null || value === undefined || value === "") {
+            return <span className="text-gray-400">—</span>;
+        }
+
+        switch (field.type) {
+            case "list":
+                if (!Array.isArray(value) || value.length === 0) {
+                    return <span className="text-gray-400">Aucun</span>;
+                }
+                return (
+                    <ul className="list-disc list-inside space-y-1">
+                        {value.map((item, idx) => (
+                            <li key={idx} className="text-gray-900">
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                );
+
+            case "grid":
+                if (!Array.isArray(value) || value.length === 0) {
+                    return <span className="text-gray-400">Aucune donnée</span>;
+                }
+                return (
+                    <table className="min-w-full border border-gray-200 rounded-lg text-sm">
+                        <thead className="bg-gray-50">
+                        <tr>
+                            {field.columns.map((col) => (
+                                <th
+                                    key={col.key}
+                                    className="px-3 py-2 text-left text-xs font-medium text-gray-600"
+                                >
+                                    {col.label}
+                                </th>
+                            ))}
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                        {value.map((row, idx) => (
+                            <tr key={idx}>
+                                {field.columns.map((col) => (
+                                    <td key={col.key} className="px-3 py-2 text-gray-900">
+                                        {row[col.key] || "—"}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                );
+
+            case "number":
+                if (field.calculated) {
+                    return (
+                        <span className="font-semibold text-cyan-700">
+              {Number(value).toLocaleString()}
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                Calculé
+              </span>
+            </span>
+                    );
+                }
+                return (
+                    <span className="font-medium text-gray-900">
+            {Number(value).toLocaleString()}
+          </span>
+                );
+
+            case "textarea":
+                return (
+                    <p className="whitespace-pre-wrap text-gray-900 leading-relaxed">
+                        {value}
+                    </p>
+                );
+
+            default:
+                return <span className="text-gray-900">{value}</span>;
+        }
+    };
+
+    // Loading
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -272,8 +474,153 @@ const ReportDetails = () => {
         );
     }
 
+    // Access Denied - Need to request access
+    if (needsAccessRequest) {
+        return (
+            <div className="max-w-2xl mx-auto mt-20">
+                <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+                <div className="bg-white rounded-xl border p-8 text-center">
+                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Lock className="w-10 h-10 text-amber-600" />
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Rapport Privé
+                    </h2>
+                    <p className="text-gray-600 mb-6">
+                        Ce rapport est privé. Vous devez demander l'autorisation à l'auteur
+                        ou à la direction pour y accéder.
+                    </p>
+
+                    <div className="flex justify-center gap-3">
+                        <button
+                            onClick={() => setShowAccessModal(true)}
+                            className="inline-flex items-center px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium"
+                        >
+                            <Lock className="w-5 h-5 mr-2" />
+                            Demander l'Accès
+                        </button>
+
+                        <button
+                            onClick={() => navigate("/reports")}
+                            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                        >
+                            Retour
+                        </button>
+                    </div>
+                </div>
+
+                {/* Access Request Modal */}
+                {showAccessModal && (
+                    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl max-w-lg w-full p-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-4">
+                                Demander l'Accès au Rapport #{id}
+                            </h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Raison de votre demande{" "}
+                                        <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        value={accessReason}
+                                        onChange={(e) => setAccessReason(e.target.value)}
+                                        placeholder="Expliquez pourquoi vous avez besoin d'accéder à ce rapport..."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                                    />
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p className="text-xs text-blue-800">
+                                        💡 Votre demande sera envoyée à l'auteur du rapport et à la
+                                        direction. Vous recevrez une notification une fois votre
+                                        demande traitée.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowAccessModal(false);
+                                        setAccessReason("");
+                                    }}
+                                    disabled={requestingAccess}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleRequestAccess}
+                                    disabled={requestingAccess || !accessReason.trim()}
+                                    className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Send className="w-4 h-4 mr-2" />
+                                    {requestingAccess ? "Envoi..." : "Envoyer la Demande"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Complete Access Denied
+    if (accessDenied) {
+        return (
+            <div className="max-w-2xl mx-auto mt-20">
+                <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+                <div className="bg-white rounded-xl border p-8 text-center">
+                    <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Shield className="w-10 h-10 text-red-600" />
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Accès Refusé
+                    </h2>
+                    <p className="text-gray-600 mb-6">
+                        Vous n'avez pas les permissions nécessaires pour consulter ce
+                        rapport.
+                    </p>
+
+                    <button
+                        onClick={() => navigate("/reports")}
+                        className="px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium"
+                    >
+                        Retour aux rapports
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Report not found
     if (!report) {
-        return <div className="p-6">Rapport non trouvé</div>;
+        return (
+            <div className="max-w-2xl mx-auto mt-20">
+                <div className="bg-white rounded-xl border p-8 text-center">
+                    <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Rapport non trouvé
+                    </h2>
+                    <p className="text-gray-600 mb-6">
+                        Le rapport demandé n'existe pas ou a été supprimé.
+                    </p>
+                    <button
+                        onClick={() => navigate("/reports")}
+                        className="px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium"
+                    >
+                        Retour aux rapports
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -284,19 +631,21 @@ const ReportDetails = () => {
             <div className="flex items-center justify-between print:hidden">
                 <div className="flex items-center space-x-4">
                     <Link
-                        to="/reports"
+                        to="reports"
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5 text-gray-600" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Détails du Rapport</h1>
-                        <p className="text-gray-600 mt-1">Rapport #{report.id}</p>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                            Rapport #{report.id}
+                        </h1>
+                        <p className="text-gray-600 mt-1">{report.department_name}</p>
                     </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
-                    {report.permissions?.canSubmit && (
+                    {permissions?.canSubmit && (
                         <button
                             onClick={handleSubmit}
                             disabled={submitting}
@@ -307,7 +656,7 @@ const ReportDetails = () => {
                         </button>
                     )}
 
-                    {report.permissions?.canValidate && (
+                    {permissions?.canValidate && (
                         <button
                             onClick={() => setShowValidateModal(true)}
                             className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -317,7 +666,7 @@ const ReportDetails = () => {
                         </button>
                     )}
 
-                    {report.permissions?.canEdit && (
+                    {permissions?.canEdit && (
                         <button
                             onClick={() => navigate(`/reports/${id}/edit`)}
                             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -327,7 +676,7 @@ const ReportDetails = () => {
                         </button>
                     )}
 
-                    {report.permissions?.canDelete && (
+                    {permissions?.canDelete && (
                         <button
                             onClick={handleDelete}
                             className="inline-flex items-center px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
@@ -346,15 +695,11 @@ const ReportDetails = () => {
                     </button>
 
                     <button
-                        onClick={handlePrint}
+                        onClick={() => window.print()}
                         className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                         title="Imprimer"
                     >
                         <Printer className="w-5 h-5" />
-                    </button>
-
-                    <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50" title="Partager">
-                        <Share2 className="w-5 h-5" />
                     </button>
                 </div>
             </div>
@@ -364,13 +709,15 @@ const ReportDetails = () => {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center space-x-3">
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${report.department_color || 'bg-cyan-100'}`}>
-                                {report.department_icon || '📊'}
+                            <div className="w-16 h-16 rounded-full bg-cyan-100 flex items-center justify-center text-2xl">
+                                📊
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">{report.department_name || 'Département'}</h2>
+                                <h2 className="text-xl font-bold text-gray-900">
+                                    {report.department_name}
+                                </h2>
                                 <p className="text-sm text-gray-600">
-                                    Département {report.department_code || '-'}
+                                    Code: {report.department_code}
                                 </p>
                             </div>
                         </div>
@@ -395,8 +742,9 @@ const ReportDetails = () => {
                                 <div className="flex items-center text-gray-900">
                                     <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                                     <span className="font-medium">
-                                        {report.period_start ? new Date(report.period_start).toLocaleDateString() : '-'} - {report.period_end ? new Date(report.period_end).toLocaleDateString() : '-'}
-                                    </span>
+                    {new Date(report.period_start).toLocaleDateString()} -{" "}
+                                        {new Date(report.period_end).toLocaleDateString()}
+                  </span>
                                 </div>
                             </div>
 
@@ -404,7 +752,9 @@ const ReportDetails = () => {
                                 <p className="text-sm text-gray-600 mb-1">Visibilité</p>
                                 <div className="flex items-center text-gray-900">
                                     <Eye className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span className="font-medium capitalize">{report.visibility || '-'}</span>
+                                    <span className="font-medium capitalize">
+                    {report.visibility}
+                  </span>
                                 </div>
                             </div>
 
@@ -412,7 +762,7 @@ const ReportDetails = () => {
                                 <p className="text-sm text-gray-600 mb-1">Créé par</p>
                                 <div className="flex items-center text-gray-900">
                                     <User className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span className="font-medium">{report.author_name || '-'}</span>
+                                    <span className="font-medium">{report.author_name}</span>
                                 </div>
                             </div>
 
@@ -421,8 +771,8 @@ const ReportDetails = () => {
                                 <div className="flex items-center text-gray-900">
                                     <Clock className="w-4 h-4 mr-2 text-gray-400" />
                                     <span className="font-medium">
-                                        {report.created_at ? new Date(report.created_at).toLocaleDateString() : '-'}
-                                    </span>
+                    {new Date(report.created_at).toLocaleDateString()}
+                  </span>
                                 </div>
                             </div>
                         </div>
@@ -430,215 +780,155 @@ const ReportDetails = () => {
                         {report.validated_by && (
                             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                                 <p className="text-sm text-green-800">
-                                    <strong>Validé par:</strong> {report.validator_name || '-'}
+                                    <strong>Validé par:</strong> {report.validator_name}
                                     <br />
-                                    <strong>Le:</strong> {report.validated_at ? new Date(report.validated_at).toLocaleString() : '-'}
+                                    <strong>Le:</strong>{" "}
+                                    {new Date(report.validated_at).toLocaleString()}
                                 </p>
                             </div>
                         )}
 
-                        {report.status === 'rejete' && report.rejection_reason && (
+                        {report.status === "rejete" && report.rejection_reason && (
                             <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                                 <p className="text-sm text-red-800">
-                                    <strong>Raison du rejet:</strong><br />
+                                    <strong>Raison du rejet:</strong>
+                                    <br />
                                     {report.rejection_reason}
                                 </p>
                             </div>
                         )}
                     </div>
 
-                    {/* Aperçu papier */}
-                    <div className="bg-gray-100 rounded-xl border p-4">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Aperçu du Rapport (papier)</h3>
+                    {/* Report Data with Template */}
+                    <div className="bg-white rounded-xl border p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">
+                            Données du Rapport
+                        </h3>
 
-                        <div className="flex justify-center">
-                            <div
-                                className="bg-white shadow-xl border w-full max-w-4xl min-h-[900px] p-10 print:shadow-none print:border-0"
-                                onMouseUp={handleTextSelection}
-                            >
-                                <div className="border-b pb-4 mb-6">
-                                    <h2 className="text-2xl font-bold text-center text-gray-900">
-                                        RAPPORT DÉPARTEMENTAL
-                                    </h2>
-                                    <p className="text-center text-sm text-gray-500 mt-1">
-                                        Rapport #{report.id} — {report.department_name} ({report.department_code})
-                                    </p>
-                                </div>
+                        {template ? (
+                            <div className="space-y-6">
+                                {template.fields.map((field) => {
+                                    const value = reportData[field.key];
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-8">
-                                    <p>
-                                        <span className="font-semibold">Période :</span>{' '}
-                                        {report.period_start ? new Date(report.period_start).toLocaleDateString() : '-'} - {report.period_end ? new Date(report.period_end).toLocaleDateString() : '-'}
-                                    </p>
-                                    <p>
-                                        <span className="font-semibold">Auteur :</span> {report.author_name || '-'}
-                                    </p>
-                                    <p>
-                                        <span className="font-semibold">Statut :</span> {report.status || '-'}
-                                    </p>
-                                    <p>
-                                        <span className="font-semibold">Visibilité :</span> {report.visibility || '-'}
-                                    </p>
-                                </div>
-
-                                <div className="space-y-6">
-                                    {Object.entries(reportData || {}).map(([key, value]) => (
-                                        <div key={key}>
-                                            <h4 className="font-bold text-gray-800 mb-2 uppercase tracking-wide text-sm">
-                                                {String(key).replace(/_/g, ' ')}
+                                    return (
+                                        <div
+                                            key={field.key}
+                                            className="border-l-4 border-cyan-500 pl-4"
+                                        >
+                                            <h4 className="font-semibold text-gray-800 mb-2">
+                                                {field.label}
+                                                {field.calculated && (
+                                                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                            Auto-calculé
+                          </span>
+                                                )}
                                             </h4>
-                                            <div className="text-gray-900 whitespace-pre-wrap leading-7 border-l-4 border-gray-200 pl-4">
-                                                {typeof value === 'object'
-                                                    ? JSON.stringify(value, null, 2)
-                                                    : (value ?? '—')}
-                                            </div>
+                                            <div className="text-sm">{renderFieldValue(field, value)}</div>
                                         </div>
-                                    ))}
-                                </div>
-
-                                {annotations?.length > 0 && (
-                                    <div className="mt-10 pt-6 border-t">
-                                        <h4 className="font-bold text-gray-900 mb-4">Annotations</h4>
-                                        <div className="space-y-3">
-                                            {annotations.map((ann, index) => (
-                                                <div
-                                                    key={ann.id || index}
-                                                    className={`p-3 rounded-lg border ${
-                                                        ann.decision === 'rejete'
-                                                            ? 'bg-red-50 border-red-200'
-                                                            : ann.decision === 'valide'
-                                                                ? 'bg-green-50 border-green-200'
-                                                                : 'bg-yellow-50 border-yellow-200'
-                                                    }`}
-                                                >
-                                                    <p className="text-sm font-semibold text-gray-800">
-                                                        {ann.user_name || 'Utilisateur'} {ann.decision ? `• ${ann.decision}` : ''}
-                                                    </p>
-                                                    <p className="text-sm text-gray-700 italic mt-1">
-                                                        “{ann.selected_text}”
-                                                    </p>
-                                                    {ann.comment && (
-                                                        <p className="text-sm text-gray-800 mt-2">{ann.comment}</p>
-                                                    )}
-                                                </div>
-                                            ))}
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            // Fallback if no template
+                            <div className="space-y-4">
+                                {Object.entries(reportData).map(([key, value]) => (
+                                    <div key={key} className="border-l-4 border-gray-300 pl-4">
+                                        <h4 className="font-semibold text-gray-800 mb-2 uppercase text-sm">
+                                            {String(key).replace(/_/g, " ")}
+                                        </h4>
+                                        <div className="text-sm text-gray-900 whitespace-pre-wrap">
+                                            {typeof value === "object"
+                                                ? JSON.stringify(value, null, 2)
+                                                : (value ?? "—")}
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {showAnnotationBox && canAnnotate && (
-                            <div className="mt-4 p-4 bg-white border rounded-lg shadow-sm">
-                                <p className="text-sm font-medium text-gray-700 mb-2">Texte sélectionné :</p>
-                                <p className="text-sm italic text-gray-900 bg-gray-50 p-2 rounded border">
-                                    "{selectedText}"
-                                </p>
-
-                                <textarea
-                                    rows={3}
-                                    value={annotationComment}
-                                    onChange={(e) => setAnnotationComment(e.target.value)}
-                                    placeholder="Commentaire / consigne sur ce passage..."
-                                    className="w-full mt-3 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                                />
-
-                                <div className="flex flex-wrap gap-2 mt-3">
-                                    <button
-                                        onClick={() => handleAddAnnotation(null)}
-                                        className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm"
-                                    >
-                                        Ajouter commentaire
-                                    </button>
-                                    <button
-                                        onClick={() => handleAddAnnotation('valide')}
-                                        className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm"
-                                    >
-                                        Marquer “Valide”
-                                    </button>
-                                    <button
-                                        onClick={() => handleAddAnnotation('rejete')}
-                                        className="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
-                                    >
-                                        Marquer “Rejeté”
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowAnnotationBox(false);
-                                            setSelectedText('');
-                                            setAnnotationComment('');
-                                        }}
-                                        className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm"
-                                    >
-                                        Annuler
-                                    </button>
-                                </div>
+                                ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Historique de validation */}
-                    {Array.isArray(report.validations) && report.validations.length > 0 && (
+                    {/* Annotations (DG only) */}
+                    {annotations?.length > 0 && (
                         <div className="bg-white rounded-xl border p-6">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                                <MessageSquare className="w-5 h-5 mr-2 text-cyan-600" />
-                                Historique de Validation
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">
+                                Annotations (Direction)
                             </h3>
 
-                            <div className="space-y-4">
-                                {report.validations.map((validation, idx) => (
-                                    <div key={idx} className="border-l-4 border-cyan-500 pl-4 py-2">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <p className="font-semibold text-gray-900">{validation.validator_name || '-'}</p>
-                                            <span
-                                                className={`text-xs font-medium px-2 py-1 rounded ${
-                                                    validation.status === 'valide'
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-red-100 text-red-800'
-                                                }`}
-                                            >
-                                                {validation.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-gray-600">{validation.comments || '-'}</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {validation.created_at ? new Date(validation.created_at).toLocaleString() : '-'}
+                            <div className="space-y-3">
+                                {annotations.map((ann, index) => (
+                                    <div
+                                        key={ann.id || index}
+                                        className={`p-4 rounded-lg border ${
+                                            ann.decision === "rejete"
+                                                ? "bg-red-50 border-red-200"
+                                                : ann.decision === "valide"
+                                                    ? "bg-green-50 border-green-200"
+                                                    : "bg-yellow-50 border-yellow-200"
+                                        }`}
+                                    >
+                                        <p className="text-sm font-semibold text-gray-800">
+                                            {ann.user_name || "Utilisateur"}
+                                            {ann.decision && (
+                                                <span className="ml-2 text-xs">• {ann.decision}</span>
+                                            )}
                                         </p>
+                                        <p className="text-sm text-gray-700 italic mt-1">
+                                            "{ann.selected_text}"
+                                        </p>
+                                        {ann.comment && (
+                                            <p className="text-sm text-gray-800 mt-2">{ann.comment}</p>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
+
+                    {/* Validation History */}
+                    {Array.isArray(report.validations) &&
+                        report.validations.length > 0 && (
+                            <div className="bg-white rounded-xl border p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                    <MessageSquare className="w-5 h-5 mr-2 text-cyan-600" />
+                                    Historique de Validation
+                                </h3>
+
+                                <div className="space-y-4">
+                                    {report.validations.map((validation, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="border-l-4 border-cyan-500 pl-4 py-2"
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="font-semibold text-gray-900">
+                                                    {validation.validator_name}
+                                                </p>
+                                                <span
+                                                    className={`text-xs font-medium px-2 py-1 rounded ${
+                                                        validation.status === "valide"
+                                                            ? "bg-green-100 text-green-800"
+                                                            : "bg-red-100 text-red-800"
+                                                    }`}
+                                                >
+                          {validation.status}
+                        </span>
+                                            </div>
+                                            <p className="text-sm text-gray-600">
+                                                {validation.comments || "—"}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                {new Date(validation.created_at).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                 </div>
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    {/* Actions rapides */}
-                    <div className="bg-white rounded-xl border p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Actions Rapides</h3>
-
-                        <div className="space-y-2">
-                            <button
-                                onClick={handleExportPdf}
-                                className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center"
-                            >
-                                <Download className="w-4 h-4 mr-3 text-gray-600" />
-                                <span className="text-sm font-medium">Télécharger PDF</span>
-                            </button>
-
-                            <button className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center">
-                                <Share2 className="w-4 h-4 mr-3 text-gray-600" />
-                                <span className="text-sm font-medium">Partager</span>
-                            </button>
-
-                            <button className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center">
-                                <FileText className="w-4 h-4 mr-3 text-gray-600" />
-                                <span className="text-sm font-medium">Dupliquer</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Commentaires */}
+                    {/* Comments */}
                     <div className="bg-white rounded-xl border p-6">
                         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
                             <MessageSquare className="w-5 h-5 mr-2 text-cyan-600" />
@@ -646,107 +936,84 @@ const ReportDetails = () => {
                         </h3>
 
                         <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
-                            {commentsLoading ? (
-                                <p className="text-sm text-gray-500">Chargement...</p>
-                            ) : comments.length === 0 ? (
+                            {comments.length === 0 ? (
                                 <p className="text-sm text-gray-500">Aucun commentaire</p>
                             ) : (
                                 comments.map((c) => (
                                     <div key={c.id} className="p-3 rounded-lg bg-gray-50 border">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-sm font-semibold text-gray-900">{c.user_name || 'Utilisateur'}</p>
+                                            <p className="text-sm font-semibold text-gray-900">
+                                                {c.user_name || "Utilisateur"}
+                                            </p>
                                             <p className="text-xs text-gray-400">
-                                                {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
+                                                {new Date(c.created_at).toLocaleString()}
                                             </p>
                                         </div>
-                                        <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{c.content}</p>
+                                        <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+                                            {c.content}
+                                        </p>
                                     </div>
                                 ))
                             )}
                         </div>
 
                         <div className="space-y-2">
-                            <textarea
-                                rows={3}
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="Ajouter un commentaire..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                            />
+              <textarea
+                  rows={3}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Ajouter un commentaire..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+              />
                             <button
                                 onClick={handleAddComment}
                                 className="w-full px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
                             >
-                                Publier commentaire
+                                Publier
                             </button>
                         </div>
                     </div>
 
-                    {/* Lecteurs */}
+                    {/* Readers */}
                     <div className="bg-white rounded-xl border p-6">
                         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
                             <Eye className="w-5 h-5 mr-2 text-cyan-600" />
-                            Lecteurs du rapport
+                            Lecteurs
                         </h3>
 
-                        {readersLoading ? (
-                            <p className="text-sm text-gray-500">Chargement...</p>
-                        ) : readers.length === 0 ? (
-                            <p className="text-sm text-gray-500">Aucune lecture enregistrée</p>
+                        {readers.length === 0 ? (
+                            <p className="text-sm text-gray-500">Aucune lecture</p>
                         ) : (
                             <div className="space-y-3">
                                 {readers.map((r, idx) => (
                                     <div
-                                        key={r.id || `${r.user_id}-${r.read_at || idx}`}
+                                        key={r.id || idx}
                                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                                     >
                                         <div>
-                                            <p className="text-sm font-medium text-gray-900">{r.full_name || r.user_name || '-'}</p>
-                                            <p className="text-xs text-gray-500">{r.department_name || '-'}</p>
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {r.full_name || r.user_name}
+                                            </p>
+                                            <p className="text-xs text-gray-500">{r.department_name}</p>
                                         </div>
                                         <p className="text-xs text-gray-400">
-                                            {r.read_at ? new Date(r.read_at).toLocaleString() : '-'}
+                                            {new Date(r.read_at).toLocaleString()}
                                         </p>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
-
-                    {/* Activité récente */}
-                    {Array.isArray(report.activities) && report.activities.length > 0 && (
-                        <div className="bg-white rounded-xl border p-6">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                                <Activity className="w-5 h-5 mr-2 text-cyan-600" />
-                                Activité Récente
-                            </h3>
-
-                            <div className="space-y-3">
-                                {report.activities.slice(0, 5).map((activity, idx) => (
-                                    <div key={idx} className="flex items-start space-x-3">
-                                        <div className="w-2 h-2 bg-cyan-500 rounded-full mt-2"></div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {String(activity.action || '').replace('_', ' ')}
-                                            </p>
-                                            <p className="text-xs text-gray-600">{activity.user_name || '-'}</p>
-                                            <p className="text-xs text-gray-400">
-                                                {activity.created_at ? new Date(activity.created_at).toLocaleString() : '-'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
-            {/* Modal Validation */}
+            {/* Validation Modal */}
             {showValidateModal && (
-                <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 print:hidden">
+                <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl max-w-lg w-full p-6">
-                        <h3 className="text-xl font-bold text-gray-900 mb-4">Valider le Rapport</h3>
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">
+                            Valider le Rapport
+                        </h3>
 
                         <div className="space-y-4">
                             <div>
@@ -755,11 +1022,11 @@ const ReportDetails = () => {
                                 </label>
                                 <div className="flex space-x-4">
                                     <button
-                                        onClick={() => setValidationStatus('valide')}
+                                        onClick={() => setValidationStatus("valide")}
                                         className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
-                                            validationStatus === 'valide'
-                                                ? 'border-green-500 bg-green-50 text-green-900'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            validationStatus === "valide"
+                                                ? "border-green-500 bg-green-50 text-green-900"
+                                                : "border-gray-200 hover:border-gray-300"
                                         }`}
                                     >
                                         <CheckCircle className="w-5 h-5 mx-auto mb-1" />
@@ -767,11 +1034,11 @@ const ReportDetails = () => {
                                     </button>
 
                                     <button
-                                        onClick={() => setValidationStatus('rejete')}
+                                        onClick={() => setValidationStatus("rejete")}
                                         className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
-                                            validationStatus === 'rejete'
-                                                ? 'border-red-500 bg-red-50 text-red-900'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            validationStatus === "rejete"
+                                                ? "border-red-500 bg-red-50 text-red-900"
+                                                : "border-gray-200 hover:border-gray-300"
                                         }`}
                                     >
                                         <XCircle className="w-5 h-5 mx-auto mb-1" />
@@ -782,18 +1049,21 @@ const ReportDetails = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Commentaires {validationStatus === 'rejete' && <span className="text-red-500">*</span>}
+                                    Commentaires{" "}
+                                    {validationStatus === "rejete" && (
+                                        <span className="text-red-500">*</span>
+                                    )}
                                 </label>
                                 <textarea
                                     rows={4}
                                     value={validationComments}
                                     onChange={(e) => setValidationComments(e.target.value)}
                                     placeholder={
-                                        validationStatus === 'valide'
-                                            ? 'Commentaires optionnels...'
-                                            : 'Veuillez indiquer la raison du rejet...'
+                                        validationStatus === "valide"
+                                            ? "Commentaires optionnels..."
+                                            : "Veuillez indiquer la raison du rejet..."
                                     }
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                                 />
                             </div>
                         </div>
@@ -809,12 +1079,12 @@ const ReportDetails = () => {
                                 onClick={handleValidate}
                                 disabled={submitting}
                                 className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
-                                    validationStatus === 'valide'
-                                        ? 'bg-green-600 hover:bg-green-700'
-                                        : 'bg-red-600 hover:bg-red-700'
+                                    validationStatus === "valide"
+                                        ? "bg-green-600 hover:bg-green-700"
+                                        : "bg-red-600 hover:bg-red-700"
                                 }`}
                             >
-                                {submitting ? 'Traitement...' : 'Confirmer'}
+                                {submitting ? "Traitement..." : "Confirmer"}
                             </button>
                         </div>
                     </div>

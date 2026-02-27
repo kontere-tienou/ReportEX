@@ -105,8 +105,7 @@ export const getDepartmentByCode = (code) => {
 export const getDepartmentMenuItems = (departmentId) => {
     const baseItems = [
         { name: 'Tableau de bord', href: 'dashboard', icon: 'LayoutDashboard' },
-        { name: 'Mes Rapports', href: 'reports', icon: 'FileText' },
-        { name: 'Statistiques', href: 'stats', icon: 'BarChart3' },
+        { name: 'Rapports', href: 'reports', icon: 'FileText' },
         { name: 'Notifications', href: 'notifications', icon: 'Bell' },
     ];
 
@@ -143,7 +142,10 @@ export const getDepartmentMenuItems = (departmentId) => {
         ],
         8: [ // Achats
             { name: 'Fournisseurs', href: 'suppliers', icon: 'Users' },
-            { name: 'Commandes', href: 'purchase-orders', icon: 'FileCheck' }
+            { name: 'Commandes', href: 'purchase-orders', icon: 'FileCheck' },
+            {name:'Demandes d’Achat(DA)', href:'purchase-request', icon:''},
+            {name:'Bons de Commande(BC)', href:'purchases-buil', icon:''},
+            {name:'Réception Marchandises', href:'reception', icon:''}
         ],
         9: [ // Commercial
             { name: 'Clients', href: 'clients', icon: 'UserCheck' },

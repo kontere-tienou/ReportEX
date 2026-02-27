@@ -173,7 +173,7 @@ const UserModal = ({ show, onClose, user, departments, onSuccess }) => {
                                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 ${
                                     errors.full_name ? 'border-red-500' : 'border-gray-300'
                                 }`}
-                                placeholder="Jean Kouassi"
+                                placeholder="Ali TRAORE"
                             />
                             {errors.full_name && (
                                 <p className="text-red-500 text-sm mt-1">{errors.full_name}</p>
@@ -268,7 +268,7 @@ const UserModal = ({ show, onClose, user, departments, onSuccess }) => {
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                                placeholder="+225 01 23 45 67 89"
+                                placeholder="+223 70 23 45 67"
                             />
                         </div>
                     </div>
