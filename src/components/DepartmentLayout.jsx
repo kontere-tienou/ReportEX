@@ -51,7 +51,7 @@ const DepartmentLayout = () => {
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // ✅ Supporte les 2 formats backend
+
     const departmentId = user?.department?.id ?? user?.department_id;
 
     // Attendre auth
@@ -81,7 +81,7 @@ const DepartmentLayout = () => {
         );
     }
 
-    // ✅ Données locales (config)
+    //Données locales (config)
     const department = getDepartmentById(Number(departmentId));
     const menuItems = getDepartmentMenuItems(Number(departmentId)) || [];
 

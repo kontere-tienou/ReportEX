@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import {reportService} from "../services/api.js";
 import {useAuth} from "../context/AuthContext.jsx";
+import {reportService} from "../pages/departments/reports/services/reportApi.js";
 
 // Composant générique de dashboard qui s'adapte à chaque département
 const GenericDepartmentDashboard = ({
@@ -21,7 +21,7 @@ const GenericDepartmentDashboard = ({
 
     const loadDashboardData = async () => {
         try {
-            const statsRes = await reportService.getDepartmentStats(user.department.id);
+            const statsRes = await reportService.getDepartmentStats();
             setStats(statsRes.data.stats);
         } catch (error) {
             console.error('Erreur:', error);

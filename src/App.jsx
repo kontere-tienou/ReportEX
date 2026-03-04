@@ -1,31 +1,39 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Login from "./pages/Login.jsx";
+import NotFoundRedirect from "./pages/NotFoundRedirect.jsx";
+
 import DepartmentDashboardRouter from "./pages/departments/DepartmentDashboardRouter.jsx";
 import {
     DepartmentsList,
-    NotificationsIT,
-    Objectives,
     SystemAdmin,
-    SystemsMonitoring,
-    TicketsIT,
-    VueConsolidee
 } from "./pages/departments/index.js";
-import {AuthProvider} from "./context/AuthContext.jsx";
+
+import { AuthProvider } from "./context/AuthContext.jsx";
+
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Reports from "./pages/departments/reports/Reports.jsx";
 import DepartmentRedirect from "./components/DepartmentRedirect.jsx";
 import DepartmentLayout from "./components/DepartmentLayout.jsx";
+
+import Reports from "./pages/departments/reports/Reports.jsx";
+import ReportBuilder from "./pages/departments/reports/builder/ReportBuilder.jsx";
+import ReportDetails from "./pages/departments/reports/reportDetails.jsx";
+
 import ParametresIT from "./pages/departments/subIT/ParametresIT.jsx";
-import ReportDetails from "./pages/departments/reports/ReportDetails.jsx";
 
 function App() {
     return (
         <AuthProvider>
             <BrowserRouter>
                 <Routes>
+
+                    {/* LOGIN */}
                     <Route path="/login" element={<Login />} />
 
-                    {/* STRUCTURE UNIQUE POUR TOUS LES DÉPARTEMENTS */}
+                    {/* ================================================= */}
+                    {/* DEPARTMENTS STRUCTURE */}
+                    {/* ================================================= */}
+
                     <Route
                         path="/departments/:deptName"
                         element={
@@ -34,75 +42,108 @@ function App() {
                             </ProtectedRoute>
                         }
                     >
-                        {/* 1. Routes Communes (Accessibles via /departments/rh/profile, /departments/it/profile, etc.) */}
-                        <Route path="notifications" element={<NotificationsIT />} />
-                        <Route path="reports" element={<Reports />} />
-                        <Route path="reports/:id" element={<ReportDetails />} />
-                        <Route path="settings" element={<ParametresIT/>}/>
 
-                        {/* 2. Le Dashboard dynamique */}
+                        {/* Dashboard */}
                         <Route index element={<DepartmentDashboardRouter />} />
                         <Route path="dashboard" element={<DepartmentDashboardRouter />} />
 
-                        {/*
-                        /////////////////////////////////////////////////////////////////////////////////////////////////
-                        3. Routes  Spécifiques par département)
-                        /////////////////////////////////////////////////////////////////////////////////////////////////
-                        */}
+                        {/* Shared */}
+                        <Route path="notifications" element={<div className="card">Notifications</div>} />
+                        <Route path="settings" element={<ParametresIT />} />
 
-                        {/* Routes protégées - RH */}
-                        <Route path="employees" element={<div className="card">Employés (à venir)</div>} />
-                        <Route path="leaves" element={<div className="card">Congés (à venir)</div>} />
+                        {/* Reports
+                        <Route path="reports" element={<Reports />} />
+                        <Route path="builder" element={<ReportBuilder />} />
+                        <Route path=":id" element={<ReportDetails />} />*/}
+                        <Route path="reports">
+                            <Route index element={<Reports />} />
+                            <Route path="builder" element={<ReportBuilder />} />
+                            <Route path=":id" element={<ReportDetails />} />
+                        </Route>
 
-                        {/* Routes protégées - Commercial */}
-                        <Route path="clients" element={<div className="card">Clients (à venir)</div>} />
-                        <Route path="sales" element={<div className="card">Ventes (à venir)</div>} />
+                        {/* RH */}
+                        <Route path="employees" element={<div className="card">Employés</div>} />
+                        <Route path="leaves" element={<div className="card">Congés</div>} />
 
-                        {/* Routes protégées - Achats */}
-                        <Route path="suppliers" element={<div className="card">Fournisseurs (à venir)</div>} />
-                        <Route path="purchase-orders" element={<div className="card">Commandes (à venir)</div>} />
+                        {/* Commercial */}
+                        <Route path="clients" element={<div className="card">Clients</div>} />
+                        <Route path="sales" element={<div className="card">Ventes</div>} />
 
+                        {/* Achats */}
+                        <Route path="suppliers" element={<div className="card">Fournisseurs</div>} />
+                        <Route path="purchase-orders" element={<div className="card">Commandes</div>} />
+                        <Route path="purchase-request" element={<div className="card">Demande d'appro</div>} />
+                        <Route path="purchases-buil" element={<div className="card">Bon de Commande</div>} />
+                        <Route path="reception" element={<div className="card">Réception Marchandises</div>} />
 
-                        {/* Routes protégées - Impression */}
-                        <Route path="orders" element={<div className="card">Commandes (à venir)</div>} />
-                        <Route path="designs" element={<div className="card">Designs (à venir)</div>} />
+                        {/* Impression */}
+                        <Route path="orders" element={<div className="card">Commandes</div>} />
+                        <Route path="designs" element={<div className="card">Designs</div>} />
 
-                        {/* Routes protégées - Filature */}
-                        <Route path="production" element={<div className="card">Production (à venir)</div>} />
-                        <Route path="quality" element={<div className="card">Qualité (à venir)</div>} />
+                        {/* Filature */}
+                        <Route path="production" element={<div className="card">Production</div>} />
+                        <Route path="quality" element={<div className="card">Qualité</div>} />
 
-                        {/* Routes protégées - Maintenance */}
-                        <Route path="interventions" element={<div className="card">Interventions (à venir)</div>} />
-                        <Route path="equipments" element={<div className="card">Équipements (à venir)</div>} />
+                        {/* Maintenance */}
+                        <Route path="interventions" element={<div className="card">Interventions</div>} />
+                        <Route path="equipments" element={<div className="card">Équipements</div>} />
 
-                        {/* Routes protégées - Bureau d'Étude */}
-                        <Route path="projects" element={<div className="card">Projets (à venir)</div>} />
-                        <Route path="research" element={<div className="card">Recherche (à venir)</div>} />
+                        {/* Bureau étude */}
+                        <Route path="projects" element={<div className="card">Projets</div>} />
+                        <Route path="research" element={<div className="card">Recherche</div>} />
 
-                        {/* Routes protégées - Comptabilité */}
-                        <Route path="bilans" element={<div className="card">Bilans (à venir)</div>} />
-                        <Route path="budget" element={<div className="card">Budget (à venir)</div>} />
+                        {/* Comptabilité */}
+                        <Route path="bilans" element={<div className="card">Bilans</div>} />
+                        <Route path="budget" element={<div className="card">Budget</div>} />
+                        <Route path="journal" element={<div className="card">Journal</div>} />
+                        <Route path="analyse" element={<div className="card">Analyse</div>} />
+                        <Route path="banque" element={<div className="card">Banque</div>} />
+                        <Route path="factures" element={<div className="card">Factures</div>} />
+                        <Route path="raports" element={<div className="card">Rapport Etat Financier</div>} />
 
-                        {/* Routes protégées - Direction */}
-                        <Route path="overview" element={<VueConsolidee />} />
+                        {/* Direction */}
+                        <Route path="overview" element={<div className="card">Overview</div>} />
                         <Route path="departments" element={<DepartmentsList />} />
-                        <Route path="objectives" element={<Objectives />} />
+                        <Route path="objectives" element={<div className="card">Objectifs</div>} />
 
-                        {/* Routes protégées - Informatique */}
-                        <Route path="tickets" element={<TicketsIT />} />
-                        <Route path="systems" element={<SystemsMonitoring />} />
+                        {/* IT */}
+                        <Route path="tickets" element={<div className="card">Tickets</div>} />
+                        <Route path="systems" element={<div className="card">Systèmes</div>} />
                         <Route path="admin" element={<SystemAdmin />} />
-                        {/*<Route path="parametres" element={<Parametres />}*/}
 
-                        {/* Routes protégées - Stock */}
+                        {/* Stock */}
                         <Route path="inventory" element={<div className="card">Inventaire</div>} />
-                        <Route path="movements" element={<div className="card">Mouvements (à venir)</div>}/>
+                        <Route path="movements" element={<div className="card">Mouvements</div>} />
+
+                        {/* ================================================= */}
+                        {/* DEPARTMENT 404 */}
+                        {/* ================================================= */}
+
+                        <Route path="*" element={<NotFoundRedirect to="dashboard" />} />
 
                     </Route>
 
-                    {/* Redirection racine */}
-                    <Route path="/" element={<ProtectedRoute><DepartmentRedirect /></ProtectedRoute>} />
-                    <Route path="*" element={<Navigate to="/" />} />
+
+                    {/* ================================================= */}
+                    {/* ROOT REDIRECT */}
+                    {/* ================================================= */}
+
+                    <Route
+                        path="/"
+                        element={
+                            <ProtectedRoute>
+                                <DepartmentRedirect />
+                            </ProtectedRoute>
+                        }
+                    />
+
+
+                    {/* ================================================= */}
+                    {/* GLOBAL 404 */}
+                    {/* ================================================= */}
+
+                    <Route path="*" element={<NotFoundRedirect to="/" />} />
+
                 </Routes>
             </BrowserRouter>
         </AuthProvider>

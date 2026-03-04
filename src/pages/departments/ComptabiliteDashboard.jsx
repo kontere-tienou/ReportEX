@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { reportService } from '../../services/api';
 import {
     DollarSign, TrendingUp, TrendingDown, PieChart, FileText, Calculator
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {reportService} from "./reports/services/reportApi.js";
 
 const ComptabiliteDashboard = () => {
     const { user } = useAuth();
@@ -33,9 +33,9 @@ const ComptabiliteDashboard = () => {
     }
 
     const budgetData = [
-        { mois: 'Jan', depenses: 850000, budget: 1000000 },
-        { mois: 'Fev', depenses: 920000, budget: 1000000 },
-        { mois: 'Mar', depenses: 780000, budget: 1000000 },
+        { mois: 'Jan', depenses: 0, budget: 0 },
+        { mois: 'Fev', depenses: 0, budget: 0 },
+        { mois: 'Mar', depenses: 0, budget: 0 },
     ];
 
     return (
@@ -55,8 +55,8 @@ const ComptabiliteDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-600 text-sm mb-1">Chiffre d'Affaires</p>
-                            <p className="text-3xl font-bold text-gray-900">2.5M</p>
-                            <p className="text-xs text-green-600 mt-1">+12% ce mois</p>
+                            <p className="text-3xl font-bold text-gray-900">0</p>
+                            <p className="text-xs text-green-600 mt-1">+0% ce mois</p>
                         </div>
                         <div className="bg-green-100 p-3 rounded-full">
                             <TrendingUp className="w-8 h-8 text-green-600" />
@@ -68,8 +68,8 @@ const ComptabiliteDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-600 text-sm mb-1">Dépenses</p>
-                            <p className="text-3xl font-bold text-gray-900">920K</p>
-                            <p className="text-xs text-gray-500 mt-1">92% du budget</p>
+                            <p className="text-3xl font-bold text-gray-900">0K</p>
+                            <p className="text-xs text-gray-500 mt-1">0% du budget</p>
                         </div>
                         <div className="bg-blue-100 p-3 rounded-full">
                             <Calculator className="w-8 h-8 text-blue-600" />
@@ -81,7 +81,7 @@ const ComptabiliteDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-600 text-sm mb-1">Factures en Attente</p>
-                            <p className="text-3xl font-bold text-gray-900">15</p>
+                            <p className="text-3xl font-bold text-gray-900">0</p>
                             <p className="text-xs text-amber-600 mt-1">À traiter</p>
                         </div>
                         <div className="bg-amber-100 p-3 rounded-full">
@@ -94,7 +94,7 @@ const ComptabiliteDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-600 text-sm mb-1">Taux Rentabilité</p>
-                            <p className="text-3xl font-bold text-gray-900">18.5%</p>
+                            <p className="text-3xl font-bold text-gray-900">0%</p>
                             <p className="text-xs text-purple-600 mt-1">Excellent</p>
                         </div>
                         <div className="bg-purple-100 p-3 rounded-full">
@@ -104,7 +104,7 @@ const ComptabiliteDashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                         <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
@@ -125,7 +125,7 @@ const ComptabiliteDashboard = () => {
 
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">Rapports Comptables</h2>
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols- gap-4">
                         <div className="p-4 border-2 border-green-200 rounded-lg">
                             <p className="text-sm text-gray-600 mb-1">Total Rapports</p>
                             <p className="text-2xl font-bold text-green-600">{stats?.total_reports || 0}</p>
@@ -140,6 +140,7 @@ const ComptabiliteDashboard = () => {
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     );

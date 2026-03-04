@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext.jsx';
-import { reportService } from '../../../services/api.js';
 import {
     Server, AlertCircle, CheckCircle, Clock, TrendingUp,
     Cpu, HardDrive, Monitor, Wifi, Database
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {reportService} from "../reports/services/reportApi.js";
 
 const InformatiqueDashboard = () => {
     const { user } = useAuth();

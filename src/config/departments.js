@@ -107,63 +107,16 @@ export const getDepartmentMenuItems = (departmentId) => {
         { name: 'Tableau de bord', href: 'dashboard', icon: 'LayoutDashboard' },
         { name: 'Rapports', href: 'reports', icon: 'FileText' },
         { name: 'Notifications', href: 'notifications', icon: 'Bell' },
+        { name: 'Données', href: 'data', icon: 'data' },
+        { name: 'Historique', href: 'history', icon: 'edit' },
     ];
 
     // Items spécifiques par département
     const departmentSpecificItems = {
-        2: [ // Comptabilité
-            { name: 'Bilans', href: 'bilans', icon: 'DollarSign' },
-            { name: 'Budget', href: 'budget', icon: 'TrendingUp' },
-            {name:'Journaux Comptables', href:'journal',icon:'TrendingUp'},
-            {name:'Comptabilité Analytique', href:'analyse',icon:'TrendingUp'},
-            {name:'Rapprochements Bancaires', href:'banque',icon:'TrendingUp'},
-            {name:'Factures Clients', href:'factures',icon:'TrendingUp'},
-            {name:'États Financiers & Rapports', href:'raports',icon:'TrendingUp'}
-        ],
-        3: [ // Bureau d'Étude
-            { name: 'Projets', href: 'projects', icon: 'Lightbulb' },
-            { name: 'Recherche', href: 'research', icon: 'Search' }
-        ],
-        4: [ // Maintenance
-            { name: 'Interventions', href: 'interventions', icon: 'Tool' },
-            { name: 'Équipements', href: 'equipments', icon: 'Cpu' }
-        ],
-        5: [ // Filature
-            { name: 'Production', href: 'production', icon: 'Package' },
-            { name: 'Qualité', href: 'quality', icon: 'CheckCircle' }
-        ],
-        6: [ // Impression
-            { name: 'Commandes', href: 'orders', icon: 'ShoppingCart' },
-            { name: 'Designs', href: 'designs', icon: 'Palette' }
-        ],
-        7: [ // Stock
-            { name: 'Inventaire', href: 'inventory', icon: 'Archive' },
-            { name: 'Mouvements', href: 'movements', icon: 'ArrowRightLeft' }
-        ],
-        8: [ // Achats
-            { name: 'Fournisseurs', href: 'suppliers', icon: 'Users' },
-            { name: 'Commandes', href: 'purchase-orders', icon: 'FileCheck' },
-            {name:'Demandes d’Achat(DA)', href:'purchase-request', icon:''},
-            {name:'Bons de Commande(BC)', href:'purchases-buil', icon:''},
-            {name:'Réception Marchandises', href:'reception', icon:''}
-        ],
-        9: [ // Commercial
-            { name: 'Clients', href: 'clients', icon: 'UserCheck' },
-            { name: 'Ventes', href: 'sales', icon: 'TrendingUp' }
-        ],
         10: [ // Informatique
             { name: 'Tickets', href: 'tickets', icon: 'AlertCircle' },
             { name: 'Systèmes', href: 'systems', icon: 'Server' },
             { name: 'Administration', href: 'admin', icon: 'Shield' }
-        ],
-        11: [ // RH
-            { name: 'Employés', href: 'employees', icon: 'Users' },
-            { name: 'Congés', href: 'leaves', icon: 'Calendar' },
-            {name:'Contrats', href:'contrats', icon: 'Calendar' },
-            {name:'Recrutement', href:'recrutements', icon: 'Calendar' },
-            {name:'Paie & Notes de frais', href:'paroll', icon: 'Calendar' },
-            {name:'Sanctions / Absences' , href: 'sanctions', icon: 'Calendar' },
-            {name:'Historique RH', href:'historicalRH', icon: 'Calendar' },
         ],
         1: [ // Direction
             { name: 'Vue Consolidée', href: 'overview', icon: 'Eye' },
