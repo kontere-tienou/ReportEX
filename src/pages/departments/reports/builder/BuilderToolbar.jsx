@@ -1,5 +1,3 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
     TrendingUp,
     BarChart3,
@@ -11,18 +9,23 @@ import {
     Activity,
 } from 'lucide-react';
 
+/**
+ * ==========================================
+ * AVAILABLE COMPONENTS
+ * ==========================================
+ */
 const AVAILABLE_COMPONENTS = [
     {
         id: 'metric_sum',
         type: 'metric',
-        name: 'Total',
+        name: 'Total (Somme)',
         icon: TrendingUp,
         description: 'Somme totale',
         config: {
             calculation: 'sum',
             field: 'qte_realisee',
             label: 'Total Production',
-            period: 'all',
+            format: 'number',
         },
     },
     {
@@ -35,7 +38,7 @@ const AVAILABLE_COMPONENTS = [
             calculation: 'avg',
             field: 'performance',
             label: 'Moyenne Performance',
-            period: 'all',
+            format: 'decimal',
         },
     },
     {
@@ -49,14 +52,15 @@ const AVAILABLE_COMPONENTS = [
             field: 'qte_realisee',
             reference: 'objectif_global',
             label: 'Taux d\'Atteinte',
+            format: 'percent',
         },
     },
     {
         id: 'chart_bar',
         type: 'chart',
-        name: 'Graphique en Barres',
+        name: 'Graphique Barres',
         icon: BarChart3,
-        description: 'Comparaison valeurs',
+        description: 'Comparaison',
         config: {
             chartType: 'bar',
             x_axis: 'date',
@@ -82,7 +86,7 @@ const AVAILABLE_COMPONENTS = [
         type: 'chart',
         name: 'Graphique Linéaire',
         icon: LineChart,
-        description: 'Évolution temps',
+        description: 'Évolution',
         config: {
             chartType: 'line',
             x_axis: 'date',
@@ -93,7 +97,7 @@ const AVAILABLE_COMPONENTS = [
     {
         id: 'table',
         type: 'table',
-        name: 'Tableau de Données',
+        name: 'Tableau',
         icon: Table2,
         description: 'Liste détaillée',
         config: {
@@ -107,66 +111,51 @@ const AVAILABLE_COMPONENTS = [
         type: 'text',
         name: 'Bloc de Texte',
         icon: FileText,
-        description: 'Commentaire libre',
+        description: 'Commentaire',
         config: {
             content: 'Votre texte ici...',
         },
     },
 ];
 
-// Composant draggable individual
-function DraggableComponent({ component, onAdd }) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: component.id,
-    });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
-    const Icon = component.icon;
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners}
-            onClick={() => onAdd(component)}
-            className="bg-white border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-cyan-500 hover:shadow-md transition-all group"
-        >
-            <div className="flex items-start space-x-3">
-                <div className="bg-cyan-100 p-2 rounded-lg group-hover:bg-cyan-200 transition-colors">
-                    <Icon className="w-5 h-5 text-cyan-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-sm group-hover:text-cyan-600 transition-colors">
-                        {component.name}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{component.description}</p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
+/**
+ * ==========================================
+ * BUILDER TOOLBAR
+ * ==========================================
+ */
 export default function BuilderToolbar({ onAddComponent }) {
     return (
         <div className="bg-white rounded-xl border p-6 sticky top-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Composants
+                Composants Disponibles
             </h3>
 
+            <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-3">
-                {AVAILABLE_COMPONENTS.map((component) => (
-                    <DraggableComponent
-                        key={component.id}
-                        component={component}
-                        onAdd={onAddComponent}
-                    />
-                ))}
+                {AVAILABLE_COMPONENTS.map((component) => {
+                    const Icon = component.icon;
+
+                    return (
+                        <button
+                            key={component.id}
+                            onClick={() => onAddComponent(component)}
+                            className="w-full bg-white border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-cyan-500 hover:shadow-md transition-all group text-left"
+                        >
+                            <div className="flex items-start space-x-3">
+                                <div className="bg-cyan-100 p-2 rounded-lg group-hover:bg-cyan-200 transition-colors flex-shrink-0">
+                                    <Icon className="w-5 h-5 text-cyan-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-gray-900 text-sm group-hover:text-cyan-600 transition-colors">
+                                        {component.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{component.description}</p>
+                                </div>
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
             </div>
 
             <div className="mt-6 p-3 bg-gray-50 rounded-lg">

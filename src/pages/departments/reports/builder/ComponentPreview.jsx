@@ -13,8 +13,15 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-// Sample data pour l'aperçu
+/**
+ * ==========================================
+ * COMPONENT PREVIEW - Aperçu des composants
+ * ==========================================
+ */
+
+// Sample data
 const SAMPLE_DATA_BAR = [
     { date: '01/01', value: 450 },
     { date: '02/01', value: 520 },
@@ -40,27 +47,56 @@ const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
 // Preview Métrique
 function MetricPreview({ component }) {
-    const { calculation, label } = component.config;
+    const { calculation, label, format } = component.config;
 
     let sampleValue = '—';
     let icon = '';
+    let trend = null;
 
     if (calculation === 'sum') {
-        sampleValue = '532,476';
+        sampleValue = format === 'currency' ? '532,476 FCFA' : '532,476';
         icon = '📊';
+        trend = { direction: 'up', value: 15 };
     } else if (calculation === 'avg') {
         sampleValue = '89.5';
         icon = '📈';
+        trend = { direction: 'up', value: 5 };
     } else if (calculation === 'percent') {
         sampleValue = '94.2%';
         icon = '✅';
+        trend = { direction: 'stable', value: 0 };
     }
 
     return (
-        <div className="text-center py-8">
+        <div className="text-center py-8 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg">
             <div className="text-5xl mb-2">{icon}</div>
             <p className="text-4xl font-bold text-cyan-600 mb-2">{sampleValue}</p>
-            <p className="text-sm text-gray-600">{label}</p>
+            <p className="text-sm text-gray-600 mb-3">{label}</p>
+
+            {trend && (
+                <div className="flex items-center justify-center space-x-2 text-sm">
+                    {trend.direction === 'up' && (
+                        <>
+                            <TrendingUp className="w-4 h-4 text-green-600" />
+                            <span className="text-green-600 font-medium">+{trend.value}%</span>
+                        </>
+                    )}
+                    {trend.direction === 'down' && (
+                        <>
+                            <TrendingDown className="w-4 h-4 text-red-600" />
+                            <span className="text-red-600 font-medium">-{trend.value}%</span>
+                        </>
+                    )}
+                    {trend.direction === 'stable' && (
+                        <>
+                            <Minus className="w-4 h-4 text-gray-600" />
+                            <span className="text-gray-600 font-medium">Stable</span>
+                        </>
+                    )}
+                    <span className="text-gray-500">vs précédent</span>
+                </div>
+            )}
+
             <p className="text-xs text-gray-400 mt-2">(Valeur d'exemple)</p>
         </div>
     );
@@ -214,7 +250,7 @@ export default function ComponentPreview({ component, department, period }) {
         default:
             return (
                 <div className="p-8 text-center text-gray-400">
-                    <p>Type de composant inconnu</p>
+                    <p>Type de composant inconnu: {component.type}</p>
                 </div>
             );
     }

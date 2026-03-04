@@ -3,11 +3,21 @@ import { CSS } from '@dnd-kit/utilities';
 import { FileText, Trash2, GripVertical } from 'lucide-react';
 import ComponentPreview from './ComponentPreview';
 
-
-// Composant draggable dans la zone
+/**
+ * ==========================================
+ * SORTABLE COMPONENT - Individual draggable item
+ * ==========================================
+ */
 function SortableComponent({ component, onRemove, department, period }) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: component.id,
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: component.id, // ✅ CRITICAL: Must match the id in SortableContext
     });
 
     const style = {
@@ -25,6 +35,7 @@ function SortableComponent({ component, onRemove, department, period }) {
             {/* Header with drag handle and delete */}
             <div className="flex items-center justify-between p-3 border-b bg-gray-50">
                 <div className="flex items-center space-x-2">
+                    {/* Drag Handle - IMPORTANT: listeners here */}
                     <div
                         {...attributes}
                         {...listeners}
@@ -32,14 +43,16 @@ function SortableComponent({ component, onRemove, department, period }) {
                     >
                         <GripVertical className="w-4 h-4 text-gray-400" />
                     </div>
+
                     <span className="text-sm font-medium text-gray-700">
-            {component.config.title || component.config.label || component.name}
+            {component.config?.title || component.config?.label || component.name || 'Composant'}
           </span>
                 </div>
 
                 <button
                     onClick={() => onRemove(component.id)}
                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    title="Supprimer"
                 >
                     <Trash2 className="w-4 h-4" />
                 </button>
@@ -57,6 +70,11 @@ function SortableComponent({ component, onRemove, department, period }) {
     );
 }
 
+/**
+ * ==========================================
+ * DROP ZONE - Main container
+ * ==========================================
+ */
 export default function DropZone({ components, onRemove, department, period }) {
     if (components.length === 0) {
         return (

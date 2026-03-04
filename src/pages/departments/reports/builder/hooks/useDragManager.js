@@ -1,14 +1,38 @@
-import { arrayMove } from '@dnd-kit/sortable';
+/**
+ * ==========================================
+ * HOOK: useDragManager
+ * Gère les événements drag & drop
+ * ==========================================
+ */
 
-export default function useDragManager(layout, setLayout) {
+export default function useDragManager(layout, moveComponent) {
     const handleDragEnd = (event) => {
         const { active, over } = event;
-        if (active.id !== over.id) {
-            const oldIndex = layout.findIndex(i => i.id === active.id);
-            const newIndex = layout.findIndex(i => i.id === over.id);
-            setLayout(arrayMove(layout, oldIndex, newIndex));
+
+        // Si pas de destination, annuler
+        if (!over) {
+            console.log('❌ No drop target');
+            return;
         }
+
+        // Si même élément, rien à faire
+        if (active.id === over.id) {
+            console.log('ℹ️ Same element, no move needed');
+            return;
+        }
+
+        console.log('🎯 Moving:', { from: active.id, to: over.id });
+
+        // Déplacer le composant
+        moveComponent(active.id, over.id);
     };
 
-    return { handleDragEnd };
+    const handleDragCancel = () => {
+        console.log('🚫 Drag cancelled');
+    };
+
+    return {
+        handleDragEnd,
+        handleDragCancel,
+    };
 }
