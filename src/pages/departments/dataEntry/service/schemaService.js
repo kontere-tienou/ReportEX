@@ -7,19 +7,48 @@ export const schemaService = {
      */
     async getDepartmentSchema(deptCode) {
         try {
-            console.log('Fetching schema for:', deptCode);
-            const response = await api.get(`/schemas/${deptCode}`);
-            console.log('Schema response:', response.data);
+            if (!deptCode) {
+                throw new Error('Department code is required');
+            }
+
+            // Clean the department code
+            const cleanCode = deptCode.trim().toUpperCase();
+
+            console.log('🔍 Fetching schema for department:', cleanCode);
+
+            const response = await api.get(`/schemas/${cleanCode}`);
+
+            if (!response.data) {
+                throw new Error('No schema data received');
+            }
+
+            console.log('✅ Schema loaded:', response.data);
             return response.data;
+
         } catch (error) {
-            console.error('Error fetching schema, using fallback:', error);
+            console.error('❌ Error fetching schema:', error);
 
-            // Use fallback schema based on department code
+            // Don't use fallback for data pages - throw the error
+            // This will help us identify missing schemas
+            throw new Error(`Schema not found for department: ${deptCode}`);
+        }
+    },
+
+    /**
+     * Get schema with fallback for UI components that can handle it
+     */
+    async getDepartmentSchemaWithFallback(deptCode) {
+        try {
+            return await this.getDepartmentSchema(deptCode);
+        } catch (error) {
+            console.warn('Using fallback schema for:', deptCode);
+
             const fallbackSchema = getFallbackSchema(deptCode);
-            console.log('Using fallback schema:', fallbackSchema);
 
-            // Add a toast notification to inform user
-            if (typeof window !== 'undefined' && window.addToast) {
+            // Only show toast in browser environment for non-critical components
+            if (typeof window !== 'undefined' && window.addToast &&
+                // Don't show for data pages, only for UI components
+                !window.location.pathname.includes('/data')) {
                 window.addToast('Mode dégradé: utilisation des schémas par défaut', 'warning', 5000);
             }
 
@@ -41,11 +70,11 @@ export const schemaService = {
     },
 
     /**
-     * Get numeric fields for a department
+     * Get numeric fields for a department - with fallback for UI
      */
     async getNumericFields(deptCode) {
         try {
-            const schema = await this.getDepartmentSchema(deptCode);
+            const schema = await this.getDepartmentSchemaWithFallback(deptCode);
             return schema.fields.filter(f => f.type === 'number');
         } catch (error) {
             console.error('Error getting numeric fields:', error);
@@ -78,6 +107,18 @@ export const schemaService = {
         } catch (error) {
             const fallback = getFallbackSchema(deptCode);
             return fallback.color || 'from-cyan-600 to-blue-600';
+        }
+    },
+
+    /**
+     * Validate if a department code exists
+     */
+    async validateDepartmentCode(deptCode) {
+        try {
+            await this.getDepartmentSchema(deptCode);
+            return true;
+        } catch (error) {
+            return false;
         }
     }
 };

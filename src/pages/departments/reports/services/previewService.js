@@ -1,167 +1,238 @@
-// pages/departments/reports/builder/services/previewDataService.js
-import api from '../../../../services/api';
+import api from '../../../../services/api.js';
 
-export const previewDataService = {
+class PreviewDataService {
+    constructor() {
+        this.requestCache = new Map();
+        this.abortControllers = new Map();
+        this.CACHE_TTL = 30 * 1000; // 30 seconds
+        this.pendingRequests = new Map();
+    }
+
     /**
-     * Fetch data for preview based on department and period
+     * Debounce identical requests
      */
-    async fetchPreviewData(deptCode, period, options = {}) {
-        try {
-            const params = {
-                limit: options.limit || 10,
-                sortBy: 'date',
-                sortOrder: 'DESC'
-            };
-
-            // Add date filters based on period
-            if (options.dateRange) {
-                if (options.dateRange.start) params.dateFrom = options.dateRange.start;
-                if (options.dateRange.end) params.dateTo = options.dateRange.end;
-            }
-
-            const response = await api.get(`/${deptCode}/data`, { params });
-
-            // Handle different response structures
-            return response.data.data || response.data || [];
-        } catch (error) {
-            console.error('Error fetching preview data:', error);
-            return [];
+    async _debounce(key, fn, delay = 300) {
+        // Check if there's a pending request
+        if (this.pendingRequests.has(key)) {
+            console.log(`⏳ Debouncing: ${key}`);
+            return this.pendingRequests.get(key);
         }
-    },
 
-    /**
-     * Fetch aggregated metrics (sum, avg, min, max, etc.)
-     */
-    async fetchMetrics(deptCode, field, calculation, period, options = {}) {
-        try {
-            // Build metrics array for aggregation
-            const metrics = [{
-                field,
-                aggregation: calculation
-            }];
-
-            const params = {
-                groupBy: 'date',
-                metrics: JSON.stringify(metrics)
-            };
-
-            // Add date filters
-            if (options.dateRange) {
-                if (options.dateRange.start) params.dateFrom = options.dateRange.start;
-                if (options.dateRange.end) params.dateTo = options.dateRange.end;
-            }
-
-            const response = await api.get(`/${deptCode}/data/aggregated`, { params });
-
-            // Calculate total from aggregated data
-            const aggregatedData = response.data.data || [];
-            let total = 0;
-
-            if (calculation === 'sum') {
-                total = aggregatedData.reduce((sum, item) => sum + (Number(item[`${field}_sum`]) || 0), 0);
-            } else if (calculation === 'avg') {
-                const sum = aggregatedData.reduce((acc, item) => acc + (Number(item[`${field}_sum`]) || 0), 0);
-                const count = aggregatedData.reduce((acc, item) => acc + (Number(item[`${field}_count`]) || 0), 0);
-                total = count > 0 ? sum / count : 0;
-            } else if (calculation === 'max') {
-                total = Math.max(...aggregatedData.map(item => Number(item[`${field}_max`]) || 0));
-            } else if (calculation === 'min') {
-                total = Math.min(...aggregatedData.map(item => Number(item[`${field}_min`]) || 0));
-            } else if (calculation === 'count') {
-                total = aggregatedData.reduce((acc, item) => acc + (Number(item[`${field}_count`]) || 0), 0);
-            }
-
-            return { value: total };
-        } catch (error) {
-            console.error('Error fetching metrics:', error);
-            return null;
-        }
-    },
-
-    /**
-     * Fetch chart data
-     */
-    async fetchChartData(deptCode, config, period, options = {}) {
-        try {
-            const { yAxis, aggregation = 'sum' } = config;
-
-            // Handle both single yAxis and array of yAxis
-            const metrics = Array.isArray(yAxis)
-                ? yAxis.map(axis => ({ field: axis, aggregation }))
-                : [{ field: yAxis, aggregation }];
-
-            const params = {
-                groupBy: 'date',
-                metrics: JSON.stringify(metrics)
-            };
-
-            // Add date filters
-            if (options.dateRange) {
-                if (options.dateRange.start) params.dateFrom = options.dateRange.start;
-                if (options.dateRange.end) params.dateTo = options.dateRange.end;
-            }
-
-            const response = await api.get(`/${deptCode}/data/aggregated`, { params });
-            const aggregatedData = response.data.data || [];
-
-            // Transform data for charts
-            return aggregatedData.map(item => {
-                const chartItem = { date: item.date };
-
-                if (Array.isArray(yAxis)) {
-                    yAxis.forEach(axis => {
-                        chartItem[axis] = Number(item[`${axis}_${aggregation}`]) || 0;
-                    });
-                } else {
-                    chartItem[yAxis] = Number(item[`${yAxis}_${aggregation}`]) || 0;
+        // Create new promise
+        const promise = new Promise(async (resolve, reject) => {
+            setTimeout(async () => {
+                try {
+                    const result = await fn();
+                    this.pendingRequests.delete(key);
+                    resolve(result);
+                } catch (error) {
+                    this.pendingRequests.delete(key);
+                    reject(error);
                 }
+            }, delay);
+        });
 
-                return chartItem;
-            });
-        } catch (error) {
-            console.error('Error fetching chart data:', error);
-            return [];
-        }
-    },
+        this.pendingRequests.set(key, promise);
+        return promise;
+    }
 
     /**
-     * Fetch pie chart data
+     * Check cache
      */
-    async fetchPieData(deptCode, fields, period, options = {}) {
-        try {
-            const metrics = fields.map(field => ({ field, aggregation: 'sum' }));
-
-            const params = {
-                groupBy: 'date',
-                metrics: JSON.stringify(metrics)
-            };
-
-            // Add date filters
-            if (options.dateRange) {
-                if (options.dateRange.start) params.dateFrom = options.dateRange.start;
-                if (options.dateRange.end) params.dateTo = options.dateRange.end;
+    _getCached(key) {
+        if (this.requestCache.has(key)) {
+            const cached = this.requestCache.get(key);
+            if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+                console.log(`📦 Cache hit: ${key}`);
+                return cached.data;
             }
+            this.requestCache.delete(key);
+        }
+        return null;
+    }
 
-            const response = await api.get(`/${deptCode}/data/aggregated`, { params });
-            const aggregatedData = response.data.data || [];
+    /**
+     * Set cache
+     */
+    _setCache(key, data) {
+        this.requestCache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    }
 
-            // Calculate totals for each field
-            const totals = {};
-            fields.forEach(field => {
-                totals[field] = aggregatedData.reduce(
-                    (sum, item) => sum + (Number(item[`${field}_sum`]) || 0),
-                    0
-                );
-            });
-
-            // Transform to pie chart format
-            return Object.entries(totals).map(([name, value]) => ({
-                name,
-                value
-            }));
-        } catch (error) {
-            console.error('Error fetching pie data:', error);
-            return [];
+    /**
+     * Cancel previous identical request
+     */
+    _cancelPreviousRequest(key) {
+        if (this.abortControllers.has(key)) {
+            console.log(`🛑 Cancelling previous request: ${key}`);
+            this.abortControllers.get(key).abort();
         }
     }
-};
+
+    /**
+     * Fetch preview data with caching and debouncing
+     */
+    async fetchPreviewData(department, options = {}) {
+        const cacheKey = `preview_${department}_${JSON.stringify(options)}`;
+
+        // Check cache
+        const cached = this._getCached(cacheKey);
+        if (cached) return cached;
+
+        // Debounce
+        return this._debounce(cacheKey, async () => {
+            this._cancelPreviousRequest(cacheKey);
+
+            const controller = new AbortController();
+            this.abortControllers.set(cacheKey, controller);
+
+            try {
+                // FIX: Remove the extra /api/ from the URL
+                const response = await api.get(`/${department}/data`, {
+                    params: {
+                        limit: options.limit || 10,
+                        sortBy: 'date',
+                        sortOrder: 'DESC',
+                        dateFrom: options.dateRange?.start,
+                        dateTo: options.dateRange?.end,
+                    },
+                    signal: controller.signal
+                });
+
+                this.abortControllers.delete(cacheKey);
+
+                // Cache the result
+                this._setCache(cacheKey, response.data);
+
+                return response.data;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Request cancelled:', cacheKey);
+                    return null;
+                }
+                throw error;
+            }
+        });
+    }
+
+    /**
+     * Fetch metrics with caching
+     */
+    async fetchMetrics(department, field, calculation, period, options = {}) {
+        const cacheKey = `metrics_${department}_${field}_${calculation}_${period}_${JSON.stringify(options.dateRange)}`;
+
+        // Check cache
+        const cached = this._getCached(cacheKey);
+        if (cached) return cached;
+
+        // Debounce
+        return this._debounce(cacheKey, async () => {
+            this._cancelPreviousRequest(cacheKey);
+
+            const controller = new AbortController();
+            this.abortControllers.set(cacheKey, controller);
+
+            try {
+                // FIX: Remove the extra /api/ from the URL
+                const response = await api.get(`/${department}/data/aggregated`, {
+                    params: {
+                        dateFrom: options.dateRange?.start,
+                        dateTo: options.dateRange?.end,
+                        metrics: JSON.stringify([{ field, aggregation: calculation }]),
+                        groupBy: 'date'
+                    },
+                    signal: controller.signal
+                });
+
+                this.abortControllers.delete(cacheKey);
+
+                // Calculate total
+                const data = response.data;
+                const total = Array.isArray(data)
+                    ? data.reduce((sum, item) => {
+                        const key = `${field}_${calculation}`;
+                        return sum + (item[key] || 0);
+                    }, 0)
+                    : data?.value || 0;
+
+                const result = { value: total };
+
+                // Cache the result
+                this._setCache(cacheKey, result);
+
+                return result;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Request cancelled:', cacheKey);
+                    return null;
+                }
+                throw error;
+            }
+        });
+    }
+
+    /**
+     * Fetch chart data with caching
+     */
+    async fetchChartData(department, config, period, options = {}) {
+        const cacheKey = `chart_${department}_${JSON.stringify(config)}_${period}_${JSON.stringify(options.dateRange)}`;
+
+        // Check cache
+        const cached = this._getCached(cacheKey);
+        if (cached) return cached;
+
+        // Debounce
+        return this._debounce(cacheKey, async () => {
+            this._cancelPreviousRequest(cacheKey);
+
+            const controller = new AbortController();
+            this.abortControllers.set(cacheKey, controller);
+
+            try {
+                const metrics = [{
+                    field: config.yAxis,
+                    aggregation: config.aggregation || 'sum'
+                }];
+
+                // FIX: Remove the extra /api/ from the URL
+                const response = await api.get(`/${department}/data/aggregated`, {
+                    params: {
+                        dateFrom: options.dateRange?.start,
+                        dateTo: options.dateRange?.end,
+                        groupBy: config.xAxis || 'date',
+                        metrics: JSON.stringify(metrics)
+                    },
+                    signal: controller.signal
+                });
+
+                this.abortControllers.delete(cacheKey);
+
+                // Cache the result
+                this._setCache(cacheKey, response.data);
+
+                return response.data;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Request cancelled:', cacheKey);
+                    return null;
+                }
+                throw error;
+            }
+        });
+    }
+
+    /**
+     * Clear cache for a department
+     */
+    clearCache(department) {
+        for (const key of this.requestCache.keys()) {
+            if (key.includes(department)) {
+                this.requestCache.delete(key);
+            }
+        }
+    }
+}
+
+export const previewDataService = new PreviewDataService();

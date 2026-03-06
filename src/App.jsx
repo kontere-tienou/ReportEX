@@ -20,7 +20,6 @@ import ReportBuilder from "./pages/departments/reports/builder/ReportBuilder.jsx
 import ReportDetails from "./pages/departments/reports/reportDetails.jsx";
 
 import ParametresIT from "./pages/departments/subIT/ParametresIT.jsx";
-import DataEntryModal from "./pages/departments/dataEntry/DataEntryModal.jsx";
 import Data from "./pages/departments/dataEntry/dataPage.jsx";
 
 function App() {

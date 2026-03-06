@@ -17,7 +17,7 @@ function SortableComponent({ component, onRemove, department, period }) {
         transition,
         isDragging,
     } = useSortable({
-        id: component.id, // ✅ CRITICAL: Must match the id in SortableContext
+        id: component.id,
     });
 
     const style = {

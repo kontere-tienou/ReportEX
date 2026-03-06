@@ -1,31 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../../../context/AuthContext.jsx';
-import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
+import { DndContext, closestCenter, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import {
     Save,
     Download,
-    Calendar,
-    FileText,
 } from 'lucide-react';
 import BuilderToolbar from './BuilderToolbar';
 import DropZone from './DropZone';
 import useReportLayout from './hooks/useReportLayout';
 import useDragManager from './hooks/useDragManager';
 import useSelectedBlock from './hooks/useSelectedBlock';
-import { reportBuilderApi } from "../services/reportBuilderApi";
 import { useToast, ToastContainer } from '../../../../components/ui/Toast';
 import BlockSettingsPanel from './BlockSettingsPanel';
-import {reportService} from "../services/reportApi.js";
+import { reportService } from "../services/reportApi.js";
 
 export default function ReportBuilder() {
     const { deptName } = useParams();
     const { user } = useAuth();
     const { toasts, addToast, removeToast } = useToast();
+    // Custom hooks - FIX: Déstructurer correctement avec loadLayout
+    const {
+        layout,
+        addComponent,
+        removeComponent,
+        moveComponent,
+        updateComponent,
+        loadLayout
+    } = useReportLayout([]);
 
-    // Custom hooks
-    const { layout, addComponent, removeComponent, moveComponent, updateComponent } = useReportLayout([]);
     const { handleDragEnd } = useDragManager(layout, moveComponent);
     const { selectedBlockId, selectBlock, clearSelection } = useSelectedBlock();
 
@@ -40,6 +44,15 @@ export default function ReportBuilder() {
         periodEnd: '',
     });
 
+    // Configure sensors for better drag experience
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        })
+    );
+
     // Create department object from user data
     const department = {
         id: user?.department_id,
@@ -50,39 +63,21 @@ export default function ReportBuilder() {
     // Get selected block for settings panel
     const selectedBlock = layout.find(block => block.id === selectedBlockId);
 
-    // Fetch the builder configuration (if needed)
+    // Load saved template
     useEffect(() => {
-        const fetchBuilderConfig = async () => {
-            setLoading(true);
+        const savedTemplate = localStorage.getItem(`report_template_${department.id}`);
+        if (savedTemplate) {
             try {
-                const response = await reportBuilderApi.initializeBuilder();
-
-                // Load saved template if exists
-                const savedTemplate = localStorage.getItem(`report_template_${department.id}`);
-                if (savedTemplate) {
-                    try {
-                        const template = JSON.parse(savedTemplate);
-                        if (template.layout) {
-                            // You might want to set the layout here
-                            // setLayout(template.layout);
-                            addToast('Template chargé', 'info', 2000);
-                        }
-                    } catch (e) {
-                        console.error('Error loading saved template:', e);
-                    }
+                const template = JSON.parse(savedTemplate);
+                if (template.layout && Array.isArray(template.layout)) {
+                    loadLayout(template.layout);
+                    addToast('Template chargé', 'info', 2000);
                 }
-
-                addToast('Builder initialisé avec succès', 'success', 2000);
-            } catch (error) {
-                console.error("Error initializing builder:", error);
-                addToast('Erreur lors de l\'initialisation du builder', 'error', 3000);
-            } finally {
-                setLoading(false);
+            } catch (e) {
+                console.error('Error loading saved template:', e);
             }
-        };
-
-        fetchBuilderConfig();
-    }, []);
+        }
+    }, [department.id]);
 
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
@@ -102,7 +97,7 @@ export default function ReportBuilder() {
         const component = layout.find(c => c.id === componentId);
         removeComponent(componentId);
         if (component) {
-            addToast(`Composant "${component.config?.title || component.name || 'supprimé'}" retiré`, 'info', 2000);
+            addToast(`Composant supprimé`, 'info', 2000);
         }
         if (selectedBlockId === componentId) {
             clearSelection();
@@ -130,12 +125,20 @@ export default function ReportBuilder() {
         };
 
         try {
+            // Save to localStorage
             localStorage.setItem(`report_template_${department.id}`, JSON.stringify(template));
-            await reportService.saveCustomTemplate({
-                name: reportConfig.title,
-                layout: layout,
-                department_id: department.id
-            });
+
+            // Save to backend (optional)
+            try {
+                await reportService.saveCustomTemplate({
+                    name: reportConfig.title,
+                    layout: layout,
+                    department_id: department.id
+                });
+            } catch (apiError) {
+                console.warn('Could not save template to backend:', apiError);
+                // Continue anyway, localStorage save succeeded
+            }
 
             addToast('Template sauvegardé avec succès !', 'success', 3000);
         } catch (error) {
@@ -145,6 +148,7 @@ export default function ReportBuilder() {
     };
 
     const handleGenerateReport = async () => {
+        // Validation
         if (!reportConfig.title) {
             addToast('Le titre du rapport est obligatoire', 'warning', 3000);
             return;
@@ -159,32 +163,27 @@ export default function ReportBuilder() {
             addToast('La date de fin est obligatoire', 'warning', 3000);
             return;
         }
+
         if (layout.length === 0) {
             addToast('Ajoutez au moins un composant au rapport', 'warning', 3000);
             return;
         }
 
-        // These come from useAuth() and useParams()
+        // Get user info
         const departmentId = user?.department_id;
         const departmentCode = user?.department?.code || department.code;
         const departmentName = user?.department?.name || department.name;
         const userId = user?.id;
         const userName = user?.full_name || user?.name;
 
-        // Log for debugging
-        console.log('👤 User Info:', {
-            userId,
-            userName,
-            departmentId,
-            departmentCode,
-            departmentName
-        });
-        // Validate department info
+        // Validate
         if (!departmentId) {
             console.error('❌ Department ID not found:', { user, department });
             addToast('Impossible de déterminer votre département', 'error', 3000);
             return;
         }
+
+        // Format components
         const formattedComponents = layout.map(comp => ({
             id: comp.id,
             type: comp.type,
@@ -194,105 +193,83 @@ export default function ReportBuilder() {
             category: comp.category,
             config: {
                 ...comp.config,
-                calculation: comp.config.calculation,
-                field: comp.config.field,
-                label: comp.config.label,
-                format: comp.config.format,
-                chartType: comp.config.chartType,
-                xAxis: comp.config.xAxis,
-                yAxis: comp.config.yAxis,
-                title: comp.config.title,
-                columns: comp.config.columns,
-                content: comp.config.content,
-                tableName: comp.config.tableName
+                calculation: comp.config?.calculation,
+                field: comp.config?.field,
+                label: comp.config?.label,
+                format: comp.config?.format,
+                chartType: comp.config?.chartType,
+                xAxis: comp.config?.xAxis,
+                yAxis: comp.config?.yAxis,
+                title: comp.config?.title,
+                columns: comp.config?.columns,
+                content: comp.config?.content,
+                tableName: comp.config?.tableName
             }
         }));
 
-        const report = {
-            // User info (automatic from context)
-            user_id: userId,
-            user_name: userName,
-            department_id: departmentId,
-            department_code: departmentCode,
-            department_name: departmentName,
+        // Prepare payload
+        const payload = {
             title: reportConfig.title,
-            period: reportConfig.period,
             period_start: reportConfig.periodStart,
             period_end: reportConfig.periodEnd,
-            layout: formattedComponents,
-            components_count: layout.length,
             visibility: "private",
-            status: "brouillon",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            summary: {
+            data: {
                 title: reportConfig.title,
-                period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
-                components: layout.length,
-                department: departmentName,
-                author: userName
+                period: reportConfig.period,
+                department_id: departmentId,
+                department_code: departmentCode,
+                department_name: departmentName,
+                user_id: userId,
+                user_name: userName,
+                layout: formattedComponents,
+                components_count: layout.length,
+                summary: {
+                    title: reportConfig.title,
+                    period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
+                    components: layout.length,
+                    department: departmentName,
+                    author: userName
+                }
             }
         };
 
-        console.log('📊 Report ready to save:', report);
+        console.log('📦 Sending payload to backend:', payload);
+
         try {
             addToast('Création du rapport en cours...', 'info', 2000);
-            const payload = {
-                period_start: reportConfig.periodStart,
-                period_end: reportConfig.periodEnd,
-                visibility: "private",
-                data: {
-                    title: reportConfig.title,
-                    period: reportConfig.period,
-                    department_id: departmentId,
-                    department_code: departmentCode,
-                    department_name: departmentName,
-                    user_id: userId,
-                    user_name: userName,
-                    layout: formattedComponents,
-                    components_count: layout.length,
-                    summary: {
-                        title: reportConfig.title,
-                        period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
-                        components: layout.length,
-                        department: departmentName,
-                        author: userName
-                    }
-                }
-            };
 
-            console.log('📦 Sending payload to backend:', payload);
             const res = await reportService.create(payload);
-            const createdReport = res.data.report || res.data;
+            const createdReport = res.data?.report || res.data;
+
             console.log('✅ Report created successfully:', createdReport);
             addToast('Rapport créé avec succès !', 'success', 3000);
+
+            // Save to localStorage as backup
             try {
-                // Save to localStorage as backup
                 const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
                 savedReports.push({
-                    ...report,
                     id: createdReport.id,
+                    title: reportConfig.title,
                     saved_at: new Date().toISOString()
                 });
-                localStorage.setItem('saved_reports', JSON.stringify(savedReports.slice(-10))); // Keep last 10
+                localStorage.setItem('saved_reports', JSON.stringify(savedReports.slice(-10)));
             } catch (storageError) {
                 console.warn('Could not save to localStorage:', storageError);
-                // Non-critical error, don't show to user
             }
 
-             setReportConfig({
-               title: '',
-              period: 'month',
-              periodStart: '',
-              periodEnd: '',
-             });
+            // Reset form
+            setReportConfig({
+                title: '',
+                period: 'month',
+                periodStart: '',
+                periodEnd: '',
+            });
 
         } catch (error) {
             console.error('❌ Error generating report:', error);
             console.error('Error response:', error.response?.data);
-            console.error('Error status:', error.response?.status);
 
-            // Get the most specific error message
+            // Get error message
             let errorMsg = 'Erreur lors de la création du rapport';
 
             if (error.response?.data?.message) {
@@ -303,27 +280,28 @@ export default function ReportBuilder() {
                 errorMsg = error.message;
             }
 
+            // Add status context
             if (error.response?.status === 400) {
                 errorMsg = 'Données invalides: ' + errorMsg;
             } else if (error.response?.status === 401) {
                 errorMsg = 'Session expirée, veuillez vous reconnecter';
             } else if (error.response?.status === 403) {
                 errorMsg = 'Vous n\'avez pas les permissions nécessaires';
-            } else if (error.response?.status === 409) {
-                errorMsg = 'Un rapport existe déjà pour cette période';
             } else if (error.response?.status === 500) {
                 errorMsg = 'Erreur serveur, veuillez réessayer plus tard';
             }
 
             addToast(errorMsg, 'error', 5000);
+
+            // Save failed report
             try {
                 const failedReports = JSON.parse(localStorage.getItem('failed_reports') || '[]');
                 failedReports.push({
-                    ...report,
+                    title: reportConfig.title,
                     error: errorMsg,
                     failed_at: new Date().toISOString()
                 });
-                localStorage.setItem('failed_reports', JSON.stringify(failedReports.slice(-5))); // Keep last 5
+                localStorage.setItem('failed_reports', JSON.stringify(failedReports.slice(-5)));
             } catch (storageError) {
                 console.warn('Could not save failed report:', storageError);
             }
@@ -332,14 +310,6 @@ export default function ReportBuilder() {
 
     // Loading state
     if (!user) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
-            </div>
-        );
-    }
-
-    if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
@@ -455,6 +425,7 @@ export default function ReportBuilder() {
             <div className="flex-1 overflow-hidden px-6 py-4">
                 <div className="max-w-7xl mx-auto h-full">
                     <DndContext
+                        sensors={sensors}
                         collisionDetection={closestCenter}
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEndWrapper}
@@ -462,7 +433,11 @@ export default function ReportBuilder() {
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
                             {/* Toolbar des composants - Scrollable */}
                             <div className="lg:col-span-1 h-full overflow-y-auto pr-2">
-                                <BuilderToolbar onAddComponent={handleAddComponent} />
+                                <BuilderToolbar
+                                    onAddComponent={handleAddComponent}
+                                    departmentCode={department.code}
+
+                                />
                             </div>
 
                             {/* Zone de dépôt - Scrollable */}

@@ -1,7 +1,5 @@
-// Data.jsx - Updated version
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
     Plus,
     Calendar,
@@ -11,20 +9,15 @@ import {
     Trash2,
     TrendingUp,
     AlertCircle,
-    RefreshCw,
 } from 'lucide-react';
 import { schemaService } from './service/schemaService.js';
 import { dataService } from './service/dataService';
 import { useToast, ToastContainer } from '../../../components/ui/Toast';
 import DataEntryModal from './DataEntryModal';
 import Table from '../../../components/ui/Table';
-import { getDepartmentDisplayName } from '../reports/builder/utils/departmentMapping.js';
-import { resolveDepartmentCode, validateDepartmentCode } from '../reports/builder/utils/departmentUtils.js';
 
 export default function Data() {
     const { user } = useAuth();
-    const { deptName } = useParams();
-    const navigate = useNavigate();
     const { toasts, addToast, removeToast } = useToast();
 
     const [dataList, setDataList] = useState([]);
@@ -36,58 +29,33 @@ export default function Data() {
     const [dateFilter, setDateFilter] = useState('');
     const [stats, setStats] = useState(null);
     const [schema, setSchema] = useState(null);
-    const [error, setError] = useState(null);
 
-    // Resolve department code
-    const deptCode = resolveDepartmentCode(deptName, user);
-    const departmentDisplayName = getDepartmentDisplayName(deptCode) || deptName || 'Département';
+    // Get department code from connected user
+    const deptCode = user?.department?.code?.toUpperCase() || 'DEFAULT';
+    const departmentName = user?.department?.name || 'Département';
 
-    // Validate and load schema
+    // Load schema based on user's department
     useEffect(() => {
-        const initializePage = async () => {
-            // Check if we have a department code
-            if (!deptCode) {
-                setError('Impossible de déterminer le département');
-                setSchemaLoading(false);
-                return;
-            }
-
-            // Validate the code
-            const isValid = await validateDepartmentCode(deptCode);
-            if (!isValid) {
-                setError(`Département "${deptCode}" non trouvé dans le système`);
-                setSchemaLoading(false);
-                return;
-            }
-
-            // Load schema
-            await loadSchema();
-        };
-
-        initializePage();
+        loadSchema();
     }, [deptCode]);
+
+    // Load data when schema is ready
+    useEffect(() => {
+        if (schema) {
+            loadData();
+            loadStats();
+        }
+    }, [schema]);
 
     const loadSchema = async () => {
         setSchemaLoading(true);
-        setError(null);
         try {
-            console.log('📥 Loading schema for department:', deptCode);
+            console.log('Loading schema for department:', deptCode);
             const deptSchema = await schemaService.getDepartmentSchema(deptCode);
-
-            if (!deptSchema) {
-                throw new Error('Schéma non trouvé');
-            }
-
-            console.log('✅ Schema loaded:', deptSchema);
+            console.log('Schema loaded:', deptSchema);
             setSchema(deptSchema);
-
-            // Once schema is loaded, load data
-            await loadData();
-            await loadStats();
-
         } catch (error) {
-            console.error('❌ Error loading schema:', error);
-            setError(error.message || 'Erreur lors du chargement du schéma');
+            console.error('Error loading schema:', error);
             addToast('Erreur lors du chargement du schéma', 'error', 3000);
         } finally {
             setSchemaLoading(false);
@@ -97,11 +65,10 @@ export default function Data() {
     const loadData = async () => {
         setLoading(true);
         try {
-            console.log('📥 Loading data for department:', deptCode);
             const data = await dataService.getAll(deptCode);
             setDataList(data);
         } catch (error) {
-            console.error('❌ Error loading data:', error);
+            console.error('Error loading data:', error);
             addToast('Erreur lors du chargement des données', 'error', 3000);
         } finally {
             setLoading(false);
@@ -113,8 +80,7 @@ export default function Data() {
             const statsData = await dataService.getStats(deptCode);
             setStats(statsData);
         } catch (error) {
-            console.error('❌ Error loading stats:', error);
-            // Don't show toast for stats error
+            console.error('Error loading stats:', error);
         }
     };
 
@@ -167,69 +133,11 @@ export default function Data() {
         }
     };
 
-    const handleRetry = () => {
-        setError(null);
-        setSchemaLoading(true);
-        loadSchema();
-    };
-
-    const handleGoBack = () => {
-        navigate(-1);
-    };
-
-    // Show error state
-    if (error) {
-        return (
-            <div className="max-w-7xl mx-auto space-y-6 p-6">
-                <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
-                    <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-red-700 mb-2">
-                        Erreur de chargement
-                    </h3>
-                    <p className="text-red-600 mb-4">
-                        {error}
-                    </p>
-                    <div className="bg-red-100 p-4 rounded-lg mb-6 max-w-lg mx-auto">
-                        <p className="text-sm text-red-800 mb-2">Informations de débogage:</p>
-                        <pre className="text-xs text-left text-red-900 overflow-auto">
-                            {JSON.stringify({
-                                deptCode,
-                                deptName,
-                                userDeptCode: user?.department?.code,
-                                userDeptName: user?.department?.name,
-                                timestamp: new Date().toISOString()
-                            }, null, 2)}
-                        </pre>
-                    </div>
-                    <div className="flex items-center justify-center space-x-4">
-                        <button
-                            onClick={handleRetry}
-                            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Réessayer
-                        </button>
-                        <button
-                            onClick={handleGoBack}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            Retour
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     // Show loading while schema is loading
     if (schemaLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto"></div>
-                    <p className="text-sm text-gray-500 mt-4">Chargement du formulaire...</p>
-                    <p className="text-xs text-gray-400 mt-2">Département: {deptCode || 'Non défini'}</p>
-                </div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
             </div>
         );
     }
@@ -239,15 +147,7 @@ export default function Data() {
             <div className="text-center py-12">
                 <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900">Erreur de chargement</h3>
-                <p className="text-gray-600">Impossible de charger le formulaire pour {departmentDisplayName}</p>
-                <p className="text-sm text-gray-500 mt-2">Code département: {deptCode}</p>
-                <button
-                    onClick={handleRetry}
-                    className="mt-4 inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
-                >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Réessayer
-                </button>
+                <p className="text-gray-600">Impossible de charger le formulaire pour votre département</p>
             </div>
         );
     }
@@ -322,18 +222,15 @@ export default function Data() {
 
             {/* Header with department icon and title */}
             <div className={`bg-gradient-to-r ${schema.color || 'from-cyan-600 to-blue-600'} rounded-xl p-6 text-white`}>
-                <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <div className="text-4xl">{schema.icon || '📊'}</div>
                         <div>
                             <h1 className="text-3xl font-bold">
-                                {schema.title || `Données ${departmentDisplayName}`}
+                                {schema.title || `Données ${departmentName}`}
                             </h1>
                             <p className="text-cyan-100 mt-1">
-                                {schema.description || `Gérez vos saisies pour ${departmentDisplayName}`}
-                            </p>
-                            <p className="text-xs text-cyan-200 mt-1">
-                                Code: {deptCode}
+                                {schema.description || `Gérez vos saisies pour ${departmentName}`}
                             </p>
                         </div>
                     </div>
@@ -468,7 +365,7 @@ export default function Data() {
                             Aucune donnée
                         </h3>
                         <p className="text-sm text-gray-500 mb-6">
-                            Commencez par créer votre première saisie pour {departmentDisplayName}
+                            Commencez par créer votre première saisie pour {departmentName}
                         </p>
                         <button
                             onClick={handleCreate}
@@ -492,7 +389,7 @@ export default function Data() {
             {/* Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <p className="text-sm text-blue-800">
-                    💡 <strong>Astuce:</strong> Saisissez vos données quotidiennes pour {departmentDisplayName}
+                    💡 <strong>Astuce:</strong> Saisissez vos données quotidiennes pour {departmentName}
                 </p>
             </div>
 
@@ -505,7 +402,7 @@ export default function Data() {
                     editingData={editingData}
                     schema={schema}
                     deptCode={deptCode}
-                    departmentName={departmentDisplayName}
+                    departmentName={departmentName}
                 />
             )}
         </div>

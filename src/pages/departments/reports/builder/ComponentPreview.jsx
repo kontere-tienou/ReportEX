@@ -347,16 +347,20 @@ function TablePreview({ component, department, period, dateRange }) {
     const loadTableData = async () => {
         setLoading(true);
         setError(null);
+
         try {
-            const tableData = await previewDataService.fetchPreviewData(
-                department,
-                period,
-                {
-                    dateRange,
-                    limit: component.config.limit || 10
-                }
-            );
-            setData(tableData);
+            const response = await previewDataService.fetchPreviewData(department, {
+                dateRange,
+                limit: component.config.limit || 10
+            });
+
+            // Extract the actual array from API response
+            const rows = Array.isArray(response)
+                ? response
+                : response?.data || [];
+
+            setData(rows);
+
         } catch (err) {
             console.error('Error loading table data:', err);
             setError('Impossible de charger les données du tableau');
@@ -367,7 +371,7 @@ function TablePreview({ component, department, period, dateRange }) {
 
     if (loading) return <LoadingPreview />;
     if (error) return <ErrorPreview message={error} />;
-    if (!data || data.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
         return (
             <div className="text-center py-8 bg-gray-50 rounded-lg">
                 <p className="text-gray-500">Aucune donnée pour cette période</p>
