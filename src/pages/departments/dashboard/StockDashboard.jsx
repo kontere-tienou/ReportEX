@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { Archive, Package, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 
 const StockDashboard = () => {

@@ -3,11 +3,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import NotFoundRedirect from "./pages/NotFoundRedirect.jsx";
 
-import DepartmentDashboardRouter from "./pages/departments/DepartmentDashboardRouter.jsx";
+import DepartmentDashboardRouter from "./pages/departments/dashboard/DepartmentDashboardRouter.jsx";
 import {
     DepartmentsList,
     SystemAdmin,
-} from "./pages/departments/index.js";
+} from "./pages/departments/dashboard/index.js";
 
 import { AuthProvider } from "./context/AuthContext.jsx";
 
@@ -20,6 +20,8 @@ import ReportBuilder from "./pages/departments/reports/builder/ReportBuilder.jsx
 import ReportDetails from "./pages/departments/reports/reportDetails.jsx";
 
 import ParametresIT from "./pages/departments/subIT/ParametresIT.jsx";
+import DataEntryModal from "./pages/departments/dataEntry/DataEntryModal.jsx";
+import Data from "./pages/departments/dataEntry/dataPage.jsx";
 
 function App() {
     return (
@@ -29,10 +31,6 @@ function App() {
 
                     {/* LOGIN */}
                     <Route path="/login" element={<Login />} />
-
-                    {/* ================================================= */}
-                    {/* DEPARTMENTS STRUCTURE */}
-                    {/* ================================================= */}
 
                     <Route
                         path="/departments/:deptName"
@@ -50,11 +48,9 @@ function App() {
                         {/* Shared */}
                         <Route path="notifications" element={<div className="card">Notifications</div>} />
                         <Route path="settings" element={<ParametresIT />} />
+                        <Route path="data" element={<Data />} />
 
-                        {/* Reports
-                        <Route path="reports" element={<Reports />} />
-                        <Route path="builder" element={<ReportBuilder />} />
-                        <Route path=":id" element={<ReportDetails />} />*/}
+                        {/* Reports*/}
                         <Route path="reports">
                             <Route index element={<Reports />} />
                             <Route path="builder" element={<ReportBuilder />} />
@@ -124,10 +120,6 @@ function App() {
                     </Route>
 
 
-                    {/* ================================================= */}
-                    {/* ROOT REDIRECT */}
-                    {/* ================================================= */}
-
                     <Route
                         path="/"
                         element={
@@ -136,11 +128,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-
-
-                    {/* ================================================= */}
-                    {/* GLOBAL 404 */}
-                    {/* ================================================= */}
 
                     <Route path="*" element={<NotFoundRedirect to="/" />} />
 

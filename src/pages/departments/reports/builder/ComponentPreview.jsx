@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
     BarChart,
     Bar,
@@ -13,64 +14,161 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-
-/**
- * ==========================================
- * COMPONENT PREVIEW - Aperçu des composants
- * ==========================================
- */
-
-// Sample data
-const SAMPLE_DATA_BAR = [
-    { date: '01/01', value: 450 },
-    { date: '02/01', value: 520 },
-    { date: '03/01', value: 380 },
-    { date: '04/01', value: 620 },
-    { date: '05/01', value: 490 },
-];
-
-const SAMPLE_DATA_PIE = [
-    { name: '1er Choix', value: 68 },
-    { name: '2ème Choix', value: 25 },
-    { name: '3ème Choix', value: 7 },
-];
-
-const SAMPLE_DATA_LINE = [
-    { date: 'S1', value: 85 },
-    { date: 'S2', value: 90 },
-    { date: 'S3', value: 78 },
-    { date: 'S4', value: 95 },
-];
+import { TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
+import { previewDataService } from '../services/previewService.js';
 
 const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
-// Preview Métrique
-function MetricPreview({ component }) {
-    const { calculation, label, format } = component.config;
+// Loading component
+function LoadingPreview() {
+    return (
+        <div className="flex items-center justify-center py-12">
+            <Loader className="w-8 h-8 text-cyan-600 animate-spin" />
+            <span className="ml-2 text-gray-600">Chargement des données...</span>
+        </div>
+    );
+}
 
-    let sampleValue = '—';
-    let icon = '';
-    let trend = null;
+// Error component
+function ErrorPreview({ message }) {
+    return (
+        <div className="text-center py-8 bg-red-50 rounded-lg">
+            <p className="text-red-600">{message || 'Erreur de chargement'}</p>
+        </div>
+    );
+}
 
-    if (calculation === 'sum') {
-        sampleValue = format === 'currency' ? '532,476 FCFA' : '532,476';
-        icon = '📊';
-        trend = { direction: 'up', value: 15 };
-    } else if (calculation === 'avg') {
-        sampleValue = '89.5';
-        icon = '📈';
-        trend = { direction: 'up', value: 5 };
-    } else if (calculation === 'percent') {
-        sampleValue = '94.2%';
-        icon = '✅';
-        trend = { direction: 'stable', value: 0 };
-    }
+// Metric Preview with real data
+function MetricPreview({ component, department, period, dateRange }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [value, setValue] = useState(null);
+    const [trend, setTrend] = useState(null);
+
+    useEffect(() => {
+        loadMetricData();
+    }, [component, department, period, dateRange]);
+
+    const loadMetricData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { field, calculation } = component.config;
+
+            // Fetch current period data
+            const currentData = await previewDataService.fetchMetrics(
+                department,
+                field,
+                calculation,
+                period,
+                { dateRange }
+            );
+
+            // Fetch previous period for trend
+            const prevDateRange = getPreviousPeriod(dateRange, period);
+            const prevData = await previewDataService.fetchMetrics(
+                department,
+                field,
+                calculation,
+                period,
+                { dateRange: prevDateRange }
+            );
+
+            setValue(currentData?.value || 0);
+
+            // Calculate trend
+            if (currentData?.value && prevData?.value) {
+                const change = ((currentData.value - prevData.value) / prevData.value) * 100;
+                setTrend({
+                    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'stable',
+                    value: Math.abs(change).toFixed(1)
+                });
+            }
+        } catch (err) {
+            console.error('Error loading metric:', err);
+            setError('Impossible de charger les données');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getPreviousPeriod = (range, period) => {
+        if (!range || !range.start || !range.end) return null;
+
+        const start = new Date(range.start);
+        const end = new Date(range.end);
+
+        switch(period) {
+            case 'day':
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+                break;
+            case 'week':
+                start.setDate(start.getDate() - 7);
+                end.setDate(end.getDate() - 7);
+                break;
+            case 'month':
+                start.setMonth(start.getMonth() - 1);
+                end.setMonth(end.getMonth() - 1);
+                break;
+            case 'quarter':
+                start.setMonth(start.getMonth() - 3);
+                end.setMonth(end.getMonth() - 3);
+                break;
+            case 'year':
+                start.setFullYear(start.getFullYear() - 1);
+                end.setFullYear(end.getFullYear() - 1);
+                break;
+        }
+
+        return {
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0]
+        };
+    };
+
+    const formatValue = (val) => {
+        const { format = 'number' } = component.config;
+
+        if (val === null || val === undefined) return '—';
+
+        try {
+            switch(format) {
+                case 'currency':
+                    return new Intl.NumberFormat('fr-FR', {
+                        style: 'currency',
+                        currency: 'XOF',
+                        maximumFractionDigits: 0
+                    }).format(val);
+                case 'percent':
+                    return new Intl.NumberFormat('fr-FR', {
+                        style: 'percent',
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1
+                    }).format(val / 100);
+                case 'decimal':
+                    return new Intl.NumberFormat('fr-FR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(val);
+                default:
+                    return new Intl.NumberFormat('fr-FR').format(val);
+            }
+        } catch (e) {
+            return val.toString();
+        }
+    };
+
+    if (loading) return <LoadingPreview />;
+    if (error) return <ErrorPreview message={error} />;
+
+    const { label } = component.config;
 
     return (
         <div className="text-center py-8 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg">
-            <div className="text-5xl mb-2">{icon}</div>
-            <p className="text-4xl font-bold text-cyan-600 mb-2">{sampleValue}</p>
+            <p className="text-4xl font-bold text-cyan-600 mb-2">
+                {formatValue(value)}
+            </p>
             <p className="text-sm text-gray-600 mb-3">{label}</p>
 
             {trend && (
@@ -93,18 +191,66 @@ function MetricPreview({ component }) {
                             <span className="text-gray-600 font-medium">Stable</span>
                         </>
                     )}
-                    <span className="text-gray-500">vs précédent</span>
+                    <span className="text-gray-500">vs période précédente</span>
                 </div>
             )}
-
-            <p className="text-xs text-gray-400 mt-2">(Valeur d'exemple)</p>
         </div>
     );
 }
 
-// Preview Chart
-function ChartPreview({ component }) {
-    const { chartType, title } = component.config;
+// Chart Preview with real data
+function ChartPreview({ component, department, period, dateRange }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [data, setData] = useState([]);
+
+    useEffect(() => {
+        loadChartData();
+    }, [component, department, period, dateRange]);
+
+    const loadChartData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { chartType, fields } = component.config;
+
+            let chartData;
+            if (chartType === 'pie' && fields) {
+                chartData = await previewDataService.fetchPieData(
+                    department,
+                    fields,
+                    period,
+                    { dateRange }
+                );
+            } else {
+                chartData = await previewDataService.fetchChartData(
+                    department,
+                    component.config,
+                    period,
+                    { dateRange }
+                );
+            }
+
+            setData(chartData);
+        } catch (err) {
+            console.error('Error loading chart data:', err);
+            setError('Impossible de charger les données du graphique');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) return <LoadingPreview />;
+    if (error) return <ErrorPreview message={error} />;
+    if (!data || data.length === 0) {
+        return (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">Aucune donnée pour cette période</p>
+            </div>
+        );
+    }
+
+    const { chartType, title, xAxis = 'date', yAxis, fields, labels } = component.config;
 
     return (
         <div className="space-y-4">
@@ -113,28 +259,39 @@ function ChartPreview({ component }) {
             <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                     {chartType === 'bar' && (
-                        <BarChart data={SAMPLE_DATA_BAR}>
+                        <BarChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
+                            <XAxis dataKey={xAxis} />
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Bar dataKey="value" fill="#06b6d4" name="Production" />
+                            {Array.isArray(yAxis) ? (
+                                yAxis.map((axis, index) => (
+                                    <Bar
+                                        key={axis}
+                                        dataKey={axis}
+                                        fill={COLORS[index % COLORS.length]}
+                                        name={labels?.[index] || axis}
+                                    />
+                                ))
+                            ) : (
+                                <Bar dataKey={yAxis} fill={COLORS[0]} />
+                            )}
                         </BarChart>
                     )}
 
                     {chartType === 'pie' && (
                         <PieChart>
                             <Pie
-                                data={SAMPLE_DATA_PIE}
+                                data={data}
                                 dataKey="value"
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={100}
-                                label
+                                label={(entry) => `${entry.name}: ${entry.value}`}
                             >
-                                {SAMPLE_DATA_PIE.map((entry, index) => (
+                                {data.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
@@ -144,38 +301,91 @@ function ChartPreview({ component }) {
                     )}
 
                     {chartType === 'line' && (
-                        <LineChart data={SAMPLE_DATA_LINE}>
+                        <LineChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
+                            <XAxis dataKey={xAxis} />
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Line
-                                type="monotone"
-                                dataKey="value"
-                                stroke="#06b6d4"
-                                strokeWidth={2}
-                                name="Performance"
-                            />
+                            {Array.isArray(yAxis) ? (
+                                yAxis.map((axis, index) => (
+                                    <Line
+                                        key={axis}
+                                        type="monotone"
+                                        dataKey={axis}
+                                        stroke={COLORS[index % COLORS.length]}
+                                        strokeWidth={2}
+                                        name={labels?.[index] || axis}
+                                    />
+                                ))
+                            ) : (
+                                <Line
+                                    type="monotone"
+                                    dataKey={yAxis}
+                                    stroke={COLORS[0]}
+                                    strokeWidth={2}
+                                />
+                            )}
                         </LineChart>
                     )}
                 </ResponsiveContainer>
             </div>
-
-            <p className="text-xs text-gray-400 text-center">(Données d'exemple)</p>
         </div>
     );
 }
 
-// Preview Table
-function TablePreview({ component }) {
+// Table Preview with real data
+function TablePreview({ component, department, period, dateRange }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [data, setData] = useState([]);
+
+    useEffect(() => {
+        loadTableData();
+    }, [component, department, period, dateRange]);
+
+    const loadTableData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const tableData = await previewDataService.fetchPreviewData(
+                department,
+                period,
+                {
+                    dateRange,
+                    limit: component.config.limit || 10
+                }
+            );
+            setData(tableData);
+        } catch (err) {
+            console.error('Error loading table data:', err);
+            setError('Impossible de charger les données du tableau');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) return <LoadingPreview />;
+    if (error) return <ErrorPreview message={error} />;
+    if (!data || data.length === 0) {
+        return (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">Aucune donnée pour cette période</p>
+            </div>
+        );
+    }
+
     const { columns, title } = component.config;
 
-    const sampleRows = [
-        ['01/01/2026', '450', '89%'],
-        ['02/01/2026', '520', '92%'],
-        ['03/01/2026', '380', '78%'],
-    ];
+    // Determine which columns to display
+    let displayColumns = columns;
+    if (!displayColumns || displayColumns.length === 0) {
+        // Auto-detect columns from first data item, excluding metadata
+        const excludeFields = ['id', 'user_id', 'created_at', 'updated_at'];
+        displayColumns = Object.keys(data[0] || {}).filter(
+            key => !excludeFields.includes(key)
+        );
+    }
 
     return (
         <div className="space-y-4">
@@ -185,19 +395,22 @@ function TablePreview({ component }) {
                 <table className="min-w-full border border-gray-200 text-sm">
                     <thead className="bg-gray-50">
                     <tr>
-                        {columns.map((col, idx) => (
-                            <th key={idx} className="px-4 py-2 text-left font-medium text-gray-700">
+                        {displayColumns.map((col) => (
+                            <th key={col} className="px-4 py-2 text-left font-medium text-gray-700">
                                 {col}
                             </th>
                         ))}
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                    {sampleRows.map((row, rowIdx) => (
-                        <tr key={rowIdx} className="hover:bg-gray-50">
-                            {row.map((cell, cellIdx) => (
-                                <td key={cellIdx} className="px-4 py-2 text-gray-600">
-                                    {cell}
+                    {data.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                            {displayColumns.map((col) => (
+                                <td key={col} className="px-4 py-2 text-gray-600">
+                                    {typeof row[col] === 'number'
+                                        ? new Intl.NumberFormat('fr-FR').format(row[col])
+                                        : row[col] || '—'
+                                    }
                                 </td>
                             ))}
                         </tr>
@@ -205,18 +418,16 @@ function TablePreview({ component }) {
                     </tbody>
                 </table>
             </div>
-
-            <p className="text-xs text-gray-400">(Données d'exemple)</p>
         </div>
     );
 }
 
-// Preview Text
+// Text Preview (static - no data needed)
 function TextPreview({ component }) {
     const { content } = component.config;
 
     return (
-        <div className="prose max-w-none">
+        <div className="prose max-w-none p-4">
             <p className="text-gray-700 whitespace-pre-wrap">
                 {content || 'Votre texte ici...'}
             </p>
@@ -225,7 +436,12 @@ function TextPreview({ component }) {
 }
 
 // Main Component Preview
-export default function ComponentPreview({ component, department, period }) {
+export default function ComponentPreview({
+                                             component,
+                                             department,
+                                             period = 'month',
+                                             dateRange = null
+                                         }) {
     if (!component) {
         return (
             <div className="p-8 text-center text-gray-400">
@@ -234,15 +450,39 @@ export default function ComponentPreview({ component, department, period }) {
         );
     }
 
+    // Use provided dateRange or default to current period
+    const effectiveDateRange = dateRange || getDefaultDateRange(period);
+
     switch (component.type) {
         case 'metric':
-            return <MetricPreview component={component} />;
+            return (
+                <MetricPreview
+                    component={component}
+                    department={department}
+                    period={period}
+                    dateRange={effectiveDateRange}
+                />
+            );
 
         case 'chart':
-            return <ChartPreview component={component} />;
+            return (
+                <ChartPreview
+                    component={component}
+                    department={department}
+                    period={period}
+                    dateRange={effectiveDateRange}
+                />
+            );
 
         case 'table':
-            return <TablePreview component={component} />;
+            return (
+                <TablePreview
+                    component={component}
+                    department={department}
+                    period={period}
+                    dateRange={effectiveDateRange}
+                />
+            );
 
         case 'text':
             return <TextPreview component={component} />;
@@ -254,4 +494,35 @@ export default function ComponentPreview({ component, department, period }) {
                 </div>
             );
     }
+}
+
+// Helper function to get default date range based on period
+function getDefaultDateRange(period) {
+    const today = new Date();
+    const end = today.toISOString().split('T')[0];
+    let start = new Date(today);
+
+    switch(period) {
+        case 'day':
+            return { start: end, end };
+        case 'week':
+            start.setDate(start.getDate() - 7);
+            break;
+        case 'month':
+            start.setMonth(start.getMonth() - 1);
+            break;
+        case 'quarter':
+            start.setMonth(start.getMonth() - 3);
+            break;
+        case 'year':
+            start.setFullYear(start.getFullYear() - 1);
+            break;
+        default:
+            start.setMonth(start.getMonth() - 1); // Default to last month
+    }
+
+    return {
+        start: start.toISOString().split('T')[0],
+        end
+    };
 }

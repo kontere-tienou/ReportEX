@@ -17,8 +17,9 @@ import useSelectedBlock from './hooks/useSelectedBlock';
 import { reportBuilderApi } from "../services/reportBuilderApi";
 import { useToast, ToastContainer } from '../../../../components/ui/Toast';
 import BlockSettingsPanel from './BlockSettingsPanel';
+import {reportService} from "../services/reportApi.js";
 
-export default function ReportBuilder({ onSave, onGenerate }) {
+export default function ReportBuilder() {
     const { deptName } = useParams();
     const { user } = useAuth();
     const { toasts, addToast, removeToast } = useToast();
@@ -55,7 +56,6 @@ export default function ReportBuilder({ onSave, onGenerate }) {
             setLoading(true);
             try {
                 const response = await reportBuilderApi.initializeBuilder();
-                console.log('Builder initialized:', response.data);
 
                 // Load saved template if exists
                 const savedTemplate = localStorage.getItem(`report_template_${department.id}`);
@@ -121,19 +121,22 @@ export default function ReportBuilder({ onSave, onGenerate }) {
         }
 
         const template = {
-            ...reportConfig,
+            title: reportConfig.title,
+            periodStart: reportConfig.periodStart,
+            periodEnd: reportConfig.periodEnd,
             department_id: department.id,
             layout: layout,
             lastModified: new Date().toISOString(),
         };
 
         try {
-            // Save to localStorage as backup
             localStorage.setItem(`report_template_${department.id}`, JSON.stringify(template));
+            await reportService.saveCustomTemplate({
+                name: reportConfig.title,
+                layout: layout,
+                department_id: department.id
+            });
 
-            if (onSave) {
-                await onSave(template);
-            }
             addToast('Template sauvegardé avec succès !', 'success', 3000);
         } catch (error) {
             console.error('Error saving template:', error);
@@ -142,7 +145,6 @@ export default function ReportBuilder({ onSave, onGenerate }) {
     };
 
     const handleGenerateReport = async () => {
-        // Validation
         if (!reportConfig.title) {
             addToast('Le titre du rapport est obligatoire', 'warning', 3000);
             return;
@@ -157,35 +159,174 @@ export default function ReportBuilder({ onSave, onGenerate }) {
             addToast('La date de fin est obligatoire', 'warning', 3000);
             return;
         }
-
         if (layout.length === 0) {
             addToast('Ajoutez au moins un composant au rapport', 'warning', 3000);
             return;
         }
 
+        // These come from useAuth() and useParams()
+        const departmentId = user?.department_id;
+        const departmentCode = user?.department?.code || department.code;
+        const departmentName = user?.department?.name || department.name;
+        const userId = user?.id;
+        const userName = user?.full_name || user?.name;
+
+        // Log for debugging
+        console.log('👤 User Info:', {
+            userId,
+            userName,
+            departmentId,
+            departmentCode,
+            departmentName
+        });
+        // Validate department info
+        if (!departmentId) {
+            console.error('❌ Department ID not found:', { user, department });
+            addToast('Impossible de déterminer votre département', 'error', 3000);
+            return;
+        }
+        const formattedComponents = layout.map(comp => ({
+            id: comp.id,
+            type: comp.type,
+            name: comp.name,
+            icon: comp.icon?.name || 'FileText',
+            fieldKey: comp.fieldKey,
+            category: comp.category,
+            config: {
+                ...comp.config,
+                calculation: comp.config.calculation,
+                field: comp.config.field,
+                label: comp.config.label,
+                format: comp.config.format,
+                chartType: comp.config.chartType,
+                xAxis: comp.config.xAxis,
+                yAxis: comp.config.yAxis,
+                title: comp.config.title,
+                columns: comp.config.columns,
+                content: comp.config.content,
+                tableName: comp.config.tableName
+            }
+        }));
+
         const report = {
-            ...reportConfig,
-            department_id: department.id,
-            department_name: department.name,
-            layout: layout,
+            // User info (automatic from context)
+            user_id: userId,
+            user_name: userName,
+            department_id: departmentId,
+            department_code: departmentCode,
+            department_name: departmentName,
+            title: reportConfig.title,
+            period: reportConfig.period,
+            period_start: reportConfig.periodStart,
+            period_end: reportConfig.periodEnd,
+            layout: formattedComponents,
+            components_count: layout.length,
+            visibility: "private",
+            status: "brouillon",
             created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            summary: {
+                title: reportConfig.title,
+                period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
+                components: layout.length,
+                department: departmentName,
+                author: userName
+            }
         };
 
+        console.log('📊 Report ready to save:', report);
         try {
-            addToast('Rapport en cours de génération...', 'info', 2000);
+            addToast('Création du rapport en cours...', 'info', 2000);
+            const payload = {
+                period_start: reportConfig.periodStart,
+                period_end: reportConfig.periodEnd,
+                visibility: "private",
+                data: {
+                    title: reportConfig.title,
+                    period: reportConfig.period,
+                    department_id: departmentId,
+                    department_code: departmentCode,
+                    department_name: departmentName,
+                    user_id: userId,
+                    user_name: userName,
+                    layout: formattedComponents,
+                    components_count: layout.length,
+                    summary: {
+                        title: reportConfig.title,
+                        period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
+                        components: layout.length,
+                        department: departmentName,
+                        author: userName
+                    }
+                }
+            };
 
-            if (onGenerate) {
-                await onGenerate(report);
+            console.log('📦 Sending payload to backend:', payload);
+            const res = await reportService.create(payload);
+            const createdReport = res.data.report || res.data;
+            console.log('✅ Report created successfully:', createdReport);
+            addToast('Rapport créé avec succès !', 'success', 3000);
+            try {
+                // Save to localStorage as backup
+                const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+                savedReports.push({
+                    ...report,
+                    id: createdReport.id,
+                    saved_at: new Date().toISOString()
+                });
+                localStorage.setItem('saved_reports', JSON.stringify(savedReports.slice(-10))); // Keep last 10
+            } catch (storageError) {
+                console.warn('Could not save to localStorage:', storageError);
+                // Non-critical error, don't show to user
             }
 
-            // Simulate generation (you can remove this in production)
-            setTimeout(() => {
-                addToast('Rapport généré avec succès !', 'success', 3000);
-            }, 1500);
+             setReportConfig({
+               title: '',
+              period: 'month',
+              periodStart: '',
+              periodEnd: '',
+             });
 
         } catch (error) {
-            console.error('Error generating report:', error);
-            addToast('Erreur lors de la génération du rapport', 'error', 3000);
+            console.error('❌ Error generating report:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+
+            // Get the most specific error message
+            let errorMsg = 'Erreur lors de la création du rapport';
+
+            if (error.response?.data?.message) {
+                errorMsg = error.response.data.message;
+            } else if (error.response?.data?.error) {
+                errorMsg = error.response.data.error;
+            } else if (error.message) {
+                errorMsg = error.message;
+            }
+
+            if (error.response?.status === 400) {
+                errorMsg = 'Données invalides: ' + errorMsg;
+            } else if (error.response?.status === 401) {
+                errorMsg = 'Session expirée, veuillez vous reconnecter';
+            } else if (error.response?.status === 403) {
+                errorMsg = 'Vous n\'avez pas les permissions nécessaires';
+            } else if (error.response?.status === 409) {
+                errorMsg = 'Un rapport existe déjà pour cette période';
+            } else if (error.response?.status === 500) {
+                errorMsg = 'Erreur serveur, veuillez réessayer plus tard';
+            }
+
+            addToast(errorMsg, 'error', 5000);
+            try {
+                const failedReports = JSON.parse(localStorage.getItem('failed_reports') || '[]');
+                failedReports.push({
+                    ...report,
+                    error: errorMsg,
+                    failed_at: new Date().toISOString()
+                });
+                localStorage.setItem('failed_reports', JSON.stringify(failedReports.slice(-5))); // Keep last 5
+            } catch (storageError) {
+                console.warn('Could not save failed report:', storageError);
+            }
         }
     };
 
@@ -335,7 +476,7 @@ export default function ReportBuilder({ onSave, onGenerate }) {
                                         onRemove={handleRemoveComponent}
                                         onSelect={selectBlock}
                                         selectedId={selectedBlockId}
-                                        department={department}
+                                        department={department.code}
                                         period={reportConfig.period}
                                     />
                                 </SortableContext>

@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { ShoppingCart, Users, FileCheck, DollarSign } from 'lucide-react';
 
 const AchatsDashboard = () => {

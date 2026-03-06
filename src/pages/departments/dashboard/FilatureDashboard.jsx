@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { Package, TrendingUp, CheckCircle, Activity } from 'lucide-react';
 
 const FilatureDashboard = () => {

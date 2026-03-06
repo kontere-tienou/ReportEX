@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { adminService } from '../../../services/api';
 import UserModal from '../users/userModal.jsx';
-import DepartmentModal from '../departmentModal.jsx';
+import DepartmentModal from '../dashboard/departmentModal.jsx';
 
 const SystemAdmin = () => {
     const [activeTab, setActiveTab] = useState('users');

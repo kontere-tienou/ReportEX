@@ -23,6 +23,8 @@ import {
     Trash2,
 } from 'lucide-react';
 import {reportAccessService, reportService} from "./services/reportApi.js";
+import {ToastContainer, useToast} from "../../../components/ui/index.js";
+import { branding } from '../../../config/brandingConstant.js';
 
 
 export default function ReportDetails() {
@@ -30,6 +32,7 @@ export default function ReportDetails() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const printRef = useRef();
+    const { toasts, addToast, removeToast } = useToast();
 
     const [report, setReport] = useState(null);
     const [permissions, setPermissions] = useState(null);
@@ -44,7 +47,7 @@ export default function ReportDetails() {
     const [showAccessRequestModal, setShowAccessRequestModal] = useState(false);
     const [accessReason, setAccessReason] = useState('');
 
-    const isDG = ['DG', 'ADMIN'].includes(user?.role?.toUpperCase());
+    const isDG = ['DG'].includes(user?.role?.toUpperCase());
 
     // Load report
     useEffect(() => {
@@ -94,6 +97,7 @@ export default function ReportDetails() {
             loadComments();
         } catch (error) {
             console.error('Error adding comment:', error);
+            addToast('Error adding comment:', 'error', 2000);
         }
     };
 
@@ -108,20 +112,21 @@ export default function ReportDetails() {
             await reportService.validate(id, validationData);
             setShowValidationModal(false);
             loadReport();
-            alert(
+            addToast(
                 validationData.status === 'valide'
                     ? 'Rapport validé avec succès'
-                    : 'Rapport rejeté'
+                    : 'Rapport rejeté','error', 2000
             );
         } catch (error) {
             console.error('Error validating:', error);
-            alert('Erreur lors de la validation');
+            addToast('Erreur lors de la validation', 'error' , 2000);
         }
     };
 
     const handleRequestAccess = async () => {
         if (!accessReason.trim()) {
-            alert('Veuillez expliquer pourquoi vous demandez l\'accès');
+
+            addToast('Veuillez expliquer pourquoi vous demandez l\'accès', 'error', 2000);
             return;
         }
 
@@ -129,7 +134,7 @@ export default function ReportDetails() {
             // Change this: use the correct service
             await reportAccessService.requestAccess(id, accessReason);
             setShowAccessRequestModal(false);
-            alert('Demande d\'accès envoyée avec succès');
+            addToast('Demande d\'accès envoyée avec succès', 'succes', 2000);
         } catch (error) {
             console.error('Error requesting access:', error);
         }
@@ -179,6 +184,7 @@ export default function ReportDetails() {
     if (permissions && !permissions.canRead) {
         return (
             <div className="max-w-2xl mx-auto mt-12">
+                <ToastContainer toasts={toasts} removeToast={removeToast} />
                 <div className="bg-white rounded-xl border-2 border-amber-200 p-8 text-center">
                     <Lock className="w-16 h-16 text-amber-600 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -251,7 +257,7 @@ export default function ReportDetails() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header Actions - No print */}
-            <div className="bg-white border-b sticky top-0 z-40 print:hidden">
+            <div className="bg-white border-b top-0 z-40 print:hidden">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
@@ -278,8 +284,8 @@ export default function ReportDetails() {
                                     statusColors[report.status]
                                 }`}
                             >
-                {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
-              </span>
+                                {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+                            </span>
 
                             {/* Actions */}
                             <button
@@ -375,13 +381,14 @@ export default function ReportDetails() {
                                     {/* Logo */}
                                     <div className="flex-1">
                                         <div className="text-cyan-600 font-bold text-3xl mb-2">
-                                            BATEX-CI
+                                            <img src={branding.logo} alt="BATEX-CI Logo" className="w-66 h-16" />
                                         </div>
                                         <p className="text-sm text-gray-600">
-                                            Société de Textile et Confection
+
+                                            Bakary CISSE Textile | Commerce et Industrie
                                         </p>
                                         <p className="text-xs text-gray-500">
-                                            Abidjan, Côte d'Ivoire
+                                            Bamako, Mali
                                         </p>
                                     </div>
 
@@ -451,14 +458,14 @@ export default function ReportDetails() {
                                         <div className="space-y-4">
                                             {Object.entries(report.data).map(([key, value]) => (
                                                 <div key={key} className="flex justify-between py-2 border-b">
-                          <span className="font-medium text-gray-700">
-                            {key.replace(/_/g, ' ').toUpperCase()}:
-                          </span>
-                                                    <span className="text-gray-900">
-                            {typeof value === 'object'
-                                ? JSON.stringify(value)
-                                : value}
-                          </span>
+                                                      <span className="font-medium text-gray-700">
+                                                        {key.replace(/_/g, ' ').toUpperCase()}:
+                                                      </span>
+                                                        <span className="text-gray-900">
+                                                        {typeof value === 'object'
+                                                            ? JSON.stringify(value)
+                                                            : value}
+                                                      </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -501,7 +508,8 @@ export default function ReportDetails() {
                             {/* FOOTER */}
                             <div className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
                                 <p>BATEX-CI • Société de Textile et Confection</p>
-                                <p>Abidjan, Côte d'Ivoire • Tel: +225 XX XX XX XX</p>
+                                <p>Bamako, Mali • Tel: +223 20 21 35 55 | 20 21 38 58</p>
+                                <p>Capital social : 1 500 000 000 FCFA</p>
                             </div>
                         </div>
                     </div>

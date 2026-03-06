@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { Palette, ShoppingCart, CheckCircle, TrendingUp } from 'lucide-react';
 
 const ImpressionDashboard = () => {

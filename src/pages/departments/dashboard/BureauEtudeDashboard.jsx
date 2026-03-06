@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { Lightbulb, Search, FileText, TrendingUp } from 'lucide-react';
 
 const BureauEtudeDashboard = () => {

@@ -23,11 +23,7 @@ const Login = () => {
             email: credentials.email.trim(),
             password: credentials.password,
         };
-        console.log("Credentials envoyés :", {
-            email: payload.email,
-            password: JSON.stringify(payload.password),
-            length: payload.password.length,
-        });
+
         const result = await login(payload);
         if (result.success) {
             navigate('/dashboard');

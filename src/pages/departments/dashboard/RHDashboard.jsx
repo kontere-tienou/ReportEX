@@ -1,4 +1,4 @@
-import GenericDepartmentDashboard from '../../components/GenericDepartmentDashboard';
+import GenericDepartmentDashboard from '../../../components/GenericDepartmentDashboard.jsx';
 import { Users, Calendar, TrendingUp, UserPlus } from 'lucide-react';
 
 const RHDashboard = () => {

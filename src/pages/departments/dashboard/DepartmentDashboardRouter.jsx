@@ -12,7 +12,7 @@ import {
     InformatiqueDashboard,
     RHDashboard,
     DirectionDashboard,
-} from ".";
+} from "./index.js";
 
 const DepartmentDashboardRouter = () => {
     const { deptName } = useParams();
