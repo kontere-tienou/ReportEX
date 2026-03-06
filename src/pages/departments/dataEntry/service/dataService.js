@@ -14,11 +14,7 @@ export const dataService = {
 
     async create(deptCode, data) {
         try {
-            console.log('📤 Creating data for department:', deptCode);
-            console.log('📦 Payload:', JSON.stringify(data, null, 2));
-
             const response = await api.post(`/${deptCode}/data`, data);
-            console.log('✅ Create successful:', response.data);
             return response.data.data;
         } catch (error) {
             console.error('❌ Create error details:', {
@@ -38,12 +34,7 @@ export const dataService = {
     },
 
     async update(deptCode, id, data) {
-        try {
-            console.log('📤 Updating data:', id, 'for department:', deptCode);
-            console.log('📦 Payload:', JSON.stringify(data, null, 2));
-
-            const response = await api.put(`/${deptCode}/data/${id}`, data);
-            console.log('✅ Update successful:', response.data);
+        try {const response = await api.put(`/${deptCode}/data/${id}`, data);
             return response.data.data;
         } catch (error) {
             console.error('❌ Update error details:', {
