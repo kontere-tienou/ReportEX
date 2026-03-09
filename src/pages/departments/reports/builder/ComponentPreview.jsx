@@ -352,7 +352,7 @@ function TablePreview({ component, department, period, dateRange }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [data, setData] = useState([]);
-    const [tableCache, setTableCache] = useState({}); // Simple cache for tables
+    const [tableCache, setTableCache] = useState({});
 
     useEffect(() => {
         loadTableData();

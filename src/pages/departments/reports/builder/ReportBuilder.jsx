@@ -26,6 +26,7 @@ import useSelectedBlock from './hooks/useSelectedBlock';
 import { useToast, ToastContainer } from '../../../../components/ui/Toast';
 import BlockSettingsPanel from './BlockSettingsPanel';
 import { reportService } from "../services/reportApi.js";
+import { getDepartmentByCode, DEPARTMENTS } from '../../../../config/departments';
 
 /* ─── Visibility pill options ─── */
 const VISIBILITY_OPTIONS = [
@@ -42,8 +43,8 @@ const PERIOD_OPTIONS = [
     { value: 'year', label: 'Année' },
 ];
 
-/* ─── Tiny helper components ─── */
-function Label({ children, required }) {
+/* ─── Tiny helper components with dynamic colors ─── */
+function Label({ children, required, color = '#4f46e5' }) {
     return (
         <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
             {children}
@@ -56,7 +57,7 @@ function Field({ children }) {
     return <div className="flex flex-col">{children}</div>;
 }
 
-function TextInput({ value, onChange, placeholder }) {
+function TextInput({ value, onChange, placeholder, color = '#4f46e5' }) {
     return (
         <input
             type="text"
@@ -66,14 +67,26 @@ function TextInput({ value, onChange, placeholder }) {
             className="
                 h-9 px-3 text-sm text-slate-800 placeholder:text-slate-300
                 bg-white border border-slate-200 rounded-lg shadow-sm
-                focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-400
-                transition-all duration-150
+                focus:outline-none focus:ring-2 transition-all duration-150
             "
+            style={{
+                '--tw-ring-color': `${color}80`,
+                '--tw-ring-opacity': 0.5,
+                '--tw-border-opacity': 1,
+                '--tw-border-color': color,
+            }}
+            onFocus={(e) => {
+                e.target.style.borderColor = color;
+                e.target.style.setProperty('--tw-ring-color', `${color}80`);
+            }}
+            onBlur={(e) => {
+                e.target.style.borderColor = '#e2e8f0';
+            }}
         />
     );
 }
 
-function DateInput({ value, onChange }) {
+function DateInput({ value, onChange, color = '#4f46e5' }) {
     return (
         <input
             type="date"
@@ -82,14 +95,26 @@ function DateInput({ value, onChange }) {
             className="
                 h-9 px-3 text-sm text-slate-700
                 bg-white border border-slate-200 rounded-lg shadow-sm
-                focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-400
-                transition-all duration-150
+                focus:outline-none focus:ring-2 transition-all duration-150
             "
+            style={{
+                '--tw-ring-color': `${color}80`,
+                '--tw-ring-opacity': 0.5,
+                '--tw-border-opacity': 1,
+                '--tw-border-color': color,
+            }}
+            onFocus={(e) => {
+                e.target.style.borderColor = color;
+                e.target.style.setProperty('--tw-ring-color', `${color}80`);
+            }}
+            onBlur={(e) => {
+                e.target.style.borderColor = '#e2e8f0';
+            }}
         />
     );
 }
 
-function Select({ value, onChange, options }) {
+function Select({ value, onChange, options, color = '#4f46e5' }) {
     return (
         <select
             value={value}
@@ -97,9 +122,21 @@ function Select({ value, onChange, options }) {
             className="
                 h-9 px-3 text-sm text-slate-700
                 bg-white border border-slate-200 rounded-lg shadow-sm
-                focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-400
-                transition-all duration-150 cursor-pointer
+                focus:outline-none focus:ring-2 transition-all duration-150 cursor-pointer
             "
+            style={{
+                '--tw-ring-color': `${color}80`,
+                '--tw-ring-opacity': 0.5,
+                '--tw-border-opacity': 1,
+                '--tw-border-color': color,
+            }}
+            onFocus={(e) => {
+                e.target.style.borderColor = color;
+                e.target.style.setProperty('--tw-ring-color', `${color}80`);
+            }}
+            onBlur={(e) => {
+                e.target.style.borderColor = '#e2e8f0';
+            }}
         >
             {options.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -108,7 +145,7 @@ function Select({ value, onChange, options }) {
     );
 }
 
-function VisibilitySelect({ value, onChange }) {
+function VisibilitySelect({ value, onChange, color = '#4f46e5' }) {
     const current = VISIBILITY_OPTIONS.find(o => o.value === value) || VISIBILITY_OPTIONS[0];
     const { Icon } = current;
     return (
@@ -120,9 +157,21 @@ function VisibilitySelect({ value, onChange }) {
                 className="
                     h-9 pl-8 pr-4 text-sm text-slate-700
                     bg-white border border-slate-200 rounded-lg shadow-sm
-                    focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-400
-                    transition-all duration-150 cursor-pointer appearance-none
+                    focus:outline-none focus:ring-2 transition-all duration-150 cursor-pointer appearance-none
                 "
+                style={{
+                    '--tw-ring-color': `${color}80`,
+                    '--tw-ring-opacity': 0.5,
+                    '--tw-border-opacity': 1,
+                    '--tw-border-color': color,
+                }}
+                onFocus={(e) => {
+                    e.target.style.borderColor = color;
+                    e.target.style.setProperty('--tw-ring-color', `${color}80`);
+                }}
+                onBlur={(e) => {
+                    e.target.style.borderColor = '#e2e8f0';
+                }}
             >
                 {VISIBILITY_OPTIONS.map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -132,14 +181,20 @@ function VisibilitySelect({ value, onChange }) {
     );
 }
 
-function ActionButton({ onClick, variant = 'secondary', icon: Icon, children, loading }) {
+function ActionButton({ onClick, variant = 'secondary', icon: Icon, children, loading, color = '#4f46e5' }) {
     const base = "inline-flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-lg transition-all duration-150 select-none";
     const styles = {
-        primary: "bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white shadow-sm shadow-indigo-300",
+        primary: `bg-[${color}] hover:brightness-110 active:scale-95 text-white shadow-sm`,
         secondary: "bg-white hover:bg-slate-50 active:scale-95 text-slate-700 border border-slate-200 shadow-sm",
     };
+
     return (
-        <button onClick={onClick} disabled={loading} className={`${base} ${styles[variant]}`}>
+        <button
+            onClick={onClick}
+            disabled={loading}
+            className={`${base} ${styles[variant]}`}
+            style={variant === 'primary' ? { backgroundColor: color } : {}}
+        >
             {loading ? (
                 <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             ) : Icon && <Icon className="w-4 h-4" />}
@@ -148,14 +203,22 @@ function ActionButton({ onClick, variant = 'secondary', icon: Icon, children, lo
     );
 }
 
-function StatBadge({ label, value, accent }) {
+function StatBadge({ label, value, accent, color = '#4f46e5' }) {
     const colors = {
-        indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+        indigo: `bg-[${color}10] text-[${color}] border-[${color}30]`,
         slate: 'bg-slate-50 text-slate-600 border-slate-200',
         emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     };
+
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${colors[accent || 'slate']}`}>
+        <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium`}
+            style={accent === 'indigo' ? {
+                backgroundColor: `${color}10`,
+                color: color,
+                borderColor: `${color}30`
+            } : {}}
+        >
             <span className="font-bold">{value}</span>
             <span className="opacity-70">{label}</span>
         </span>
@@ -167,6 +230,16 @@ export default function ReportBuilder() {
     const { deptName } = useParams();
     const { user } = useAuth();
     const { toasts, addToast, removeToast } = useToast();
+
+    // Get department color
+    const department = {
+        id: user?.department_id,
+        name: user?.department?.name || deptName || 'Département',
+        code: user?.department?.code || deptName?.toUpperCase() || 'DEPT'
+    };
+
+    const departmentConfig = getDepartmentByCode(department.code) || DEPARTMENTS.COMPTABILITE;
+    const departmentColor = departmentConfig?.color || '#10b981';
 
     const {
         layout,
@@ -195,12 +268,6 @@ export default function ReportBuilder() {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
     );
-
-    const department = {
-        id: user?.department_id,
-        name: user?.department?.name || deptName || 'Département',
-        code: user?.department?.code || deptName?.toUpperCase() || 'DEPT'
-    };
 
     const selectedBlock = layout.find(block => block.id === selectedBlockId);
 
@@ -249,55 +316,7 @@ export default function ReportBuilder() {
         } catch { addToast('Erreur de sauvegarde', 'error', 3000); }
     };
 
-    /*const handleGenerateReport = async () => {
-        if (!reportConfig.title) { addToast('Titre obligatoire', 'warning', 3000); return; }
-        if (!reportConfig.periodStart) { addToast('Date de début obligatoire', 'warning', 3000); return; }
-        if (!reportConfig.periodEnd) { addToast('Date de fin obligatoire', 'warning', 3000); return; }
-        if (!layout.length) { addToast('Ajoutez au moins un composant', 'warning', 3000); return; }
-
-        const { id: departmentId, code: departmentCode, name: departmentName } = department;
-        if (!departmentId) { addToast('Département introuvable', 'error', 3000); return; }
-
-        const payload = {
-            title: reportConfig.title,
-            period_start: reportConfig.periodStart,
-            period_end: reportConfig.periodEnd,
-            visibility: reportConfig.visibility,
-            data: {
-                title: reportConfig.title,
-                period: reportConfig.period,
-                department_id: departmentId,
-                department_code: departmentCode,
-                department_name: departmentName,
-                user_id: user?.id,
-                user_name: user?.full_name || user?.name,
-                layout: layout.map(c => ({ ...c, icon: c.icon?.name || 'FileText' })),
-                components_count: layout.length,
-                summary: {
-                    title: reportConfig.title,
-                    period: `${reportConfig.periodStart} au ${reportConfig.periodEnd}`,
-                    components: layout.length,
-                    department: departmentName,
-                    author: user?.full_name,
-                }
-            }
-        };
-
-        try {
-            setLoading(true);
-            addToast('Génération en cours…', 'info', 2000);
-            const res = await reportService.create(payload);
-            addToast('Rapport créé !', 'success', 3000);
-            setReportConfig({ title: '', period: 'month', periodStart: '', periodEnd: '', visibility: 'private' });
-        } catch (err) {
-            const msg = err.response?.data?.message || err.message || 'Erreur serveur';
-            addToast(msg, 'error', 5000);
-        } finally {
-            setLoading(false);
-        }
-    };*/
     const handleGenerateReport = async () => {
-
         if (!reportConfig.title) {
             addToast('Titre obligatoire', 'warning', 3000);
             return;
@@ -327,17 +346,13 @@ export default function ReportBuilder() {
 
         const payload = {
             title: reportConfig.title,
-
             period_start: reportConfig.periodStart,
             period_end: reportConfig.periodEnd,
-
             visibility: reportConfig.visibility,
-
             layout: layout.map(c => ({
                 ...c,
                 icon: c.icon?.name || "FileText"
             })),
-
             dateRange: {
                 start: reportConfig.periodStart,
                 end: reportConfig.periodEnd,
@@ -346,15 +361,10 @@ export default function ReportBuilder() {
         };
 
         try {
-
             setLoading(true);
-
             addToast('Génération en cours…', 'info', 2000);
-
             await reportService.create(payload);
-
             addToast('Rapport créé !', 'success', 3000);
-
             setReportConfig({
                 title: '',
                 period: 'month',
@@ -362,28 +372,31 @@ export default function ReportBuilder() {
                 periodEnd: '',
                 visibility: 'private'
             });
-
         } catch (err) {
-
             const msg =
                 err.response?.data?.message ||
                 err.message ||
                 'Erreur serveur';
-
             addToast(msg, 'error', 5000);
             console.log(payload);
-
         } finally {
             setLoading(false);
         }
     };
+
     const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 
     if (!user) {
         return (
             <div className="flex items-center justify-center h-screen bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                    <div
+                        className="w-12 h-12 border-4 rounded-full animate-spin"
+                        style={{
+                            borderColor: `${departmentColor}20`,
+                            borderTopColor: departmentColor
+                        }}
+                    />
                     <p className="text-sm text-slate-400 font-medium tracking-wide">Chargement…</p>
                 </div>
             </div>
@@ -403,9 +416,12 @@ export default function ReportBuilder() {
 
                     {/* Row 1 — Brand + actions */}
                     <div className="flex items-center justify-between h-14 gap-4">
-                        {/* Brand */}
+                        {/* Brand with dynamic color */}
                         <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
+                            <div
+                                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
+                                style={{ backgroundColor: departmentColor }}
+                            >
                                 <FileText className="w-4 h-4 text-white" />
                             </div>
                             <div className="min-w-0">
@@ -415,7 +431,12 @@ export default function ReportBuilder() {
                                 <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                                     {department.name}
                                     <span className="mx-1.5 opacity-40">·</span>
-                                    <span className="font-semibold text-indigo-500">{department.code}</span>
+                                    <span
+                                        className="font-semibold"
+                                        style={{ color: departmentColor }}
+                                    >
+                                        {department.code}
+                                    </span>
                                 </p>
                             </div>
                         </div>
@@ -427,12 +448,18 @@ export default function ReportBuilder() {
                                 <VisibilitySelect
                                     value={reportConfig.visibility}
                                     onChange={e => patch('visibility', e.target.value)}
+                                    color={departmentColor}
                                 />
                             </div>
 
                             <div className="hidden xs:block w-px h-6 bg-slate-200" />
 
-                            <ActionButton onClick={handleSaveTemplate} icon={Save} variant="secondary">
+                            <ActionButton
+                                onClick={handleSaveTemplate}
+                                icon={Save}
+                                variant="secondary"
+                                color={departmentColor}
+                            >
                                 <span className="hidden sm:inline">Template</span>
                             </ActionButton>
 
@@ -441,6 +468,7 @@ export default function ReportBuilder() {
                                 icon={loading ? null : Download}
                                 variant="primary"
                                 loading={loading}
+                                color={departmentColor}
                             >
                                 <span className="hidden xs:inline">Générer</span>
                             </ActionButton>
@@ -457,6 +485,7 @@ export default function ReportBuilder() {
                                     value={reportConfig.title}
                                     onChange={e => patch('title', e.target.value)}
                                     placeholder="Rapport Mensuel Janvier 2026"
+                                    color={departmentColor}
                                 />
                             </div>
                         </Field>
@@ -470,6 +499,7 @@ export default function ReportBuilder() {
                                 value={reportConfig.period}
                                 onChange={e => patch('period', e.target.value)}
                                 options={PERIOD_OPTIONS}
+                                color={departmentColor}
                             />
                         </Field>
 
@@ -477,14 +507,22 @@ export default function ReportBuilder() {
                         <div className="flex items-end gap-2">
                             <Field>
                                 <Label required>Du</Label>
-                                <DateInput value={reportConfig.periodStart} onChange={e => patch('periodStart', e.target.value)} />
+                                <DateInput
+                                    value={reportConfig.periodStart}
+                                    onChange={e => patch('periodStart', e.target.value)}
+                                    color={departmentColor}
+                                />
                             </Field>
                             <div className="h-9 flex items-center">
                                 <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
                             </div>
                             <Field>
                                 <Label required>Au</Label>
-                                <DateInput value={reportConfig.periodEnd} onChange={e => patch('periodEnd', e.target.value)} />
+                                <DateInput
+                                    value={reportConfig.periodEnd}
+                                    onChange={e => patch('periodEnd', e.target.value)}
+                                    color={departmentColor}
+                                />
                             </Field>
                         </div>
 
@@ -492,7 +530,11 @@ export default function ReportBuilder() {
                         <div className="sm:hidden ml-auto">
                             <Field>
                                 <Label>Visibilité</Label>
-                                <VisibilitySelect value={reportConfig.visibility} onChange={e => patch('visibility', e.target.value)} />
+                                <VisibilitySelect
+                                    value={reportConfig.visibility}
+                                    onChange={e => patch('visibility', e.target.value)}
+                                    color={departmentColor}
+                                />
                             </Field>
                         </div>
                     </div>
@@ -518,10 +560,13 @@ export default function ReportBuilder() {
                                 `}
                             >
                                 <div className="h-full flex flex-col gap-3 w-64 lg:w-72">
-                                    {/* Sidebar header */}
+                                    {/* Sidebar header with dynamic color */}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <Layers className="w-4 h-4 text-indigo-500" />
+                                            <Layers
+                                                className="w-4 h-4"
+                                                style={{ color: departmentColor }}
+                                            />
                                             <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                                                 Composants
                                             </span>
@@ -540,6 +585,7 @@ export default function ReportBuilder() {
                                         <BuilderToolbar
                                             onAddComponent={handleAddComponent}
                                             departmentCode={department.code}
+                                            departmentColor={departmentColor}
                                         />
                                     </div>
                                 </div>
@@ -555,7 +601,10 @@ export default function ReportBuilder() {
                                                 onClick={() => setSidebarOpen(true)}
                                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 shadow-sm text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                                             >
-                                                <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                                                <Layers
+                                                    className="w-3.5 h-3.5"
+                                                    style={{ color: departmentColor }}
+                                                />
                                                 Composants
                                             </button>
                                         )}
@@ -570,12 +619,14 @@ export default function ReportBuilder() {
                                             value={layout.length}
                                             label={layout.length === 1 ? 'bloc' : 'blocs'}
                                             accent={layout.length > 0 ? 'indigo' : 'slate'}
+                                            color={departmentColor}
                                         />
                                         {reportConfig.periodStart && (
                                             <StatBadge
                                                 value={formatDate(reportConfig.periodStart)}
                                                 label={reportConfig.periodEnd ? `→ ${formatDate(reportConfig.periodEnd)}` : ''}
                                                 accent="slate"
+                                                color={departmentColor}
                                             />
                                         )}
                                     </div>
@@ -594,6 +645,7 @@ export default function ReportBuilder() {
                                             selectedId={selectedBlockId}
                                             department={department.code}
                                             period={reportConfig.period}
+                                            departmentColor={departmentColor}
                                         />
                                     </SortableContext>
                                 </div>
@@ -601,16 +653,29 @@ export default function ReportBuilder() {
                                 {/* ── FOOTER STATUS BAR ── */}
                                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-slate-100 shadow-sm">
                                     <div className="flex items-center gap-3 text-xs text-slate-400">
-                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${layout.length > 0 ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                                        <div
+                                            className={`w-2 h-2 rounded-full flex-shrink-0`}
+                                            style={{
+                                                backgroundColor: layout.length > 0 ? departmentColor : '#e2e8f0'
+                                            }}
+                                        />
                                         <span>
                                             {layout.length > 0
                                                 ? `${layout.length} composant${layout.length > 1 ? 's' : ''} configuré${layout.length > 1 ? 's' : ''}`
                                                 : 'Aucun composant — glissez un bloc depuis le panneau gauche'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-medium">
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">Cliquez sur un bloc pour le configurer</span>
+                                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                                        <Sparkles
+                                            className="w-3.5 h-3.5"
+                                            style={{ color: departmentColor }}
+                                        />
+                                        <span
+                                            className="hidden sm:inline"
+                                            style={{ color: departmentColor }}
+                                        >
+                                            Cliquez sur un bloc pour le configurer
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -619,9 +684,18 @@ export default function ReportBuilder() {
                         {/* Drag overlay */}
                         <DragOverlay>
                             {activeId && (
-                                <div className="bg-white border-2 border-indigo-400 rounded-xl px-4 py-3 shadow-xl shadow-indigo-100/80 rotate-1 scale-105 transition-transform">
+                                <div
+                                    className="bg-white border-2 rounded-xl px-4 py-3 shadow-xl rotate-1 scale-105 transition-transform"
+                                    style={{
+                                        borderColor: departmentColor,
+                                        boxShadow: `0 20px 25px -5px ${departmentColor}20, 0 8px 10px -6px ${departmentColor}10`
+                                    }}
+                                >
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                                        <div
+                                            className="w-2 h-2 rounded-full animate-pulse"
+                                            style={{ backgroundColor: departmentColor }}
+                                        />
                                         <p className="text-sm font-semibold text-slate-700">Déplacement…</p>
                                     </div>
                                 </div>
@@ -637,6 +711,7 @@ export default function ReportBuilder() {
                     block={selectedBlock}
                     updateComponent={handleUpdateComponent}
                     onClose={clearSelection}
+                    departmentColor={departmentColor}
                 />
             )}
         </div>

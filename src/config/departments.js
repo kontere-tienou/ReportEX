@@ -3,7 +3,7 @@
 export const DEPARTMENTS = {
     COMPTABILITE: {
         id: 2,
-        code: 'COMPTA',
+        code: 'COMPTABILITE',
         name: 'Comptabilité',
         color: '#10b981',
         icon: '💰',
@@ -99,6 +99,10 @@ export const getDepartmentById = (id) => {
 // Fonction helper pour obtenir les infos du département par code
 export const getDepartmentByCode = (code) => {
     return Object.values(DEPARTMENTS).find(dept => dept.code === code);
+};
+// Fonction helper pour obtenir les infos du département par code
+export const getDepartmentByColor = (code) => {
+    return Object.values(DEPARTMENTS).find(dept => dept.color === code);
 };
 
 // Menu de navigation spécifique par département
