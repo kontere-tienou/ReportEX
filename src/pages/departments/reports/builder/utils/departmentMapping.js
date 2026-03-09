@@ -21,7 +21,7 @@ export const getDepartmentDisplayName = (deptCode) => {
         'CONFECTION': 'Confection',
         'TEINTURE': 'Teinture',
         'PRODUCTION': 'Production',
-        'IT': 'Informatique',
+        'IT': 'IT',
         'RH': 'Ressources Humaines',
         'ACHATS': 'Achats',
         'BUREAU_ETUDE': "Bureau d'Études",

@@ -1,4 +1,4 @@
-// Data.jsx - Updated version
+// Data.jsx - With integrated table formatters
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -20,6 +20,31 @@ import DataEntryModal from './DataEntryModal';
 import Table from '../../../components/ui/Table';
 import { getDepartmentDisplayName } from '../reports/builder/utils/departmentMapping.js';
 import { resolveDepartmentCode, validateDepartmentCode } from '../reports/builder/utils/departmentUtils.js';
+import {
+    formatCellValue,
+    formatDateValue,
+    formatMoneyFCFA,
+    formatNumberValue,
+    isDateValue
+} from "../reports/builder/utils/tableFormaterUtils.js";
+
+    // Money columns
+    const moneyColumns = [
+        'ca',
+        'ca_journalier',
+        'ca_cumule',
+        'caisse_entrees',
+        'caisse_sorties',
+        'solde_caisse',
+        'montant',
+        'montant_achats_jour',
+        'total',
+        'prix',
+        'cout',
+        'budget',
+        'economies_realisees'
+    ];
+
 
 export default function Data() {
     const { user } = useAuth();
@@ -45,20 +70,17 @@ export default function Data() {
     // Validate and load schema
     useEffect(() => {
         const initializePage = async () => {
-            // Check if we have a department code
             if (!deptCode) {
                 setError('Impossible de déterminer le département');
                 setSchemaLoading(false);
                 return;
             }
-            // Validate the code
             const isValid = await validateDepartmentCode(deptCode);
             if (!isValid) {
                 setError(`Département "${deptCode}" non trouvé dans le système`);
                 setSchemaLoading(false);
                 return;
             }
-            // Load schema
             await loadSchema();
         };
 
@@ -74,10 +96,8 @@ export default function Data() {
                 throw new Error('Schéma non trouvé');
             }
             setSchema(deptSchema);
-            // Once schema is loaded, load data
             await loadData();
             await loadStats();
-
         } catch (error) {
             console.error('❌ Error loading schema:', error);
             setError(error.message || 'Erreur lors du chargement du schéma');
@@ -254,7 +274,7 @@ export default function Data() {
         return matchSearch && matchDate;
     });
 
-    // Préparer colonnes table based on schema
+    // ✅ Préparer colonnes table avec formatters intégrés
     const columns = [
         {
             key: 'date',
@@ -264,7 +284,7 @@ export default function Data() {
                 <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="font-medium">
-                        {new Date(value).toLocaleDateString('fr-FR')}
+                        {formatDateValue(value)}
                     </span>
                 </div>
             ),
@@ -278,7 +298,7 @@ export default function Data() {
                 sortable: true,
                 render: (value) => (
                     <span className="text-gray-900">
-                        {typeof value === 'number' ? value.toLocaleString() : value || '—'}
+                        {formatCellValue(value, field.key, field.type)}
                     </span>
                 ),
             })),
@@ -343,7 +363,7 @@ export default function Data() {
                             <div>
                                 <p className="text-sm text-gray-600">Total Saisies</p>
                                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {stats.total || 0}
+                                    {formatNumberValue(stats.total || 0)}
                                 </p>
                             </div>
                             <div className="p-3 bg-blue-100 rounded-lg">
@@ -357,7 +377,7 @@ export default function Data() {
                             <div>
                                 <p className="text-sm text-gray-600">Ce Mois</p>
                                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {stats.thisMonth || 0}
+                                    {formatNumberValue(stats.thisMonth || 0)}
                                 </p>
                             </div>
                             <div className="p-3 bg-green-100 rounded-lg">
@@ -371,7 +391,7 @@ export default function Data() {
                             <div>
                                 <p className="text-sm text-gray-600">Cette Semaine</p>
                                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {stats.thisWeek || 0}
+                                    {formatNumberValue(stats.thisWeek || 0)}
                                 </p>
                             </div>
                             <div className="p-3 bg-purple-100 rounded-lg">
@@ -385,7 +405,7 @@ export default function Data() {
                             <div>
                                 <p className="text-sm text-gray-600">Aujourd'hui</p>
                                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {stats.today || 0}
+                                    {formatNumberValue(stats.today || 0)}
                                 </p>
                             </div>
                             <div className="p-3 bg-amber-100 rounded-lg">
@@ -480,7 +500,8 @@ export default function Data() {
             {/* Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <p className="text-sm text-blue-800">
-                    💡 <strong>Astuce:</strong> Saisissez vos données quotidiennes pour {departmentDisplayName}
+                    💡 <strong>Astuce:</strong> Saisissez vos données quotidiennes pour {departmentDisplayName}.
+                    Les montants sont formatés automatiquement en FCFA.
                 </p>
             </div>
 
