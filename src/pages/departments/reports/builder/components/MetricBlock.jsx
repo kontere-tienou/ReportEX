@@ -69,7 +69,7 @@ export default function MetricBlock({ component, value }) {
                 <div className="flex items-center justify-center gap-1 text-sm mt-3">
                     <TrendingUp className="w-4 h-4 text-green-600" />
                     <span className="font-medium text-green-600">+{trendValue}%</span>
-                    <span className="text-gray-500">vs période précédente</span>
+                    <span className="text-gray-500">versus période précédente</span>
                 </div>
             );
         }

@@ -1,3 +1,4 @@
+// frontend/src/services/previewDataService.js
 import api from '../../../../services/api.js';
 
 class PreviewDataService {
@@ -9,68 +10,44 @@ class PreviewDataService {
     }
 
     /**
-     * Debounce identical requests
+     * Fetch multiple metrics in one batch request
      */
-    async _debounce(key, fn, delay = 300) {
-        // Check if there's a pending request
-        if (this.pendingRequests.has(key)) {
-            return this.pendingRequests.get(key);
-        }
+    async fetchBatchMetrics(department, metricRequests, options = {}) {
+        const cacheKey = `batch_${department}_${JSON.stringify(metricRequests)}_${JSON.stringify(options.dateRange)}`;
 
-        // Create new promise
-        const promise = new Promise(async (resolve, reject) => {
-            setTimeout(async () => {
-                try {
-                    const result = await fn();
-                    this.pendingRequests.delete(key);
-                    resolve(result);
-                } catch (error) {
-                    this.pendingRequests.delete(key);
-                    reject(error);
+        // Check cache
+        const cached = this._getCached(cacheKey);
+        if (cached) return cached;
+
+        // Debounce
+        return this._debounce(cacheKey, async () => {
+            this._cancelPreviousRequest(cacheKey);
+
+            const controller = new AbortController();
+            this.abortControllers.set(cacheKey, controller);
+
+            try {
+                const response = await api.post(`/${department}/data/batch`, {
+                    metrics: metricRequests,
+                    dateFrom: options.dateRange?.start,
+                    dateTo: options.dateRange?.end,
+                    groupBy: options.groupBy
+                }, {
+                    signal: controller.signal
+                });
+
+                this.abortControllers.delete(cacheKey);
+                this._setCache(cacheKey, response.data.data);
+                return response.data.data;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    return null;
                 }
-            }, delay);
-        });
-
-        this.pendingRequests.set(key, promise);
-        return promise;
-    }
-
-    /**
-     * Check cache
-     */
-    _getCached(key) {
-        if (this.requestCache.has(key)) {
-            const cached = this.requestCache.get(key);
-            if (Date.now() - cached.timestamp < this.CACHE_TTL) {
-                return cached.data;
+                throw error;
             }
-            this.requestCache.delete(key);
-        }
-        return null;
-    }
-
-    /**
-     * Set cache
-     */
-    _setCache(key, data) {
-        this.requestCache.set(key, {
-            data,
-            timestamp: Date.now()
         });
     }
 
-    /**
-     * Cancel previous identical request
-     */
-    _cancelPreviousRequest(key) {
-        if (this.abortControllers.has(key)) {
-            this.abortControllers.get(key).abort();
-        }
-    }
-
-    /**
-     * Fetch preview data with caching and debouncing
-     */
     async fetchPreviewData(department, options = {}) {
         const cacheKey = `preview_${department}_${JSON.stringify(options)}`;
 
@@ -112,18 +89,12 @@ class PreviewDataService {
             }
         });
     }
+    async fetchPieData(department, fields, period, options = {}) {
+        const cacheKey = `pie_${department}_${JSON.stringify(fields)}_${JSON.stringify(options.dateRange)}`;
 
-    /**
-     * Fetch metrics with caching
-     */
-    async fetchMetrics(department, field, calculation, period, options = {}) {
-        const cacheKey = `metrics_${department}_${field}_${calculation}_${period}_${JSON.stringify(options.dateRange)}`;
-
-        // Check cache
         const cached = this._getCached(cacheKey);
         if (cached) return cached;
 
-        // Debounce
         return this._debounce(cacheKey, async () => {
             this._cancelPreviousRequest(cacheKey);
 
@@ -131,48 +102,32 @@ class PreviewDataService {
             this.abortControllers.set(cacheKey, controller);
 
             try {
-                // FIX: Remove the extra /api/ from the URL
-                const response = await api.get(`/${department}/data/aggregated`, {
-                    params: {
-                        dateFrom: options.dateRange?.start,
-                        dateTo: options.dateRange?.end,
-                        metrics: JSON.stringify([{ field, aggregation: calculation }]),
-                        groupBy: 'date'
-                    },
+                const response = await api.post(`/${department}/data/pie`, {
+                    fields,
+                    dateFrom: options.dateRange?.start,
+                    dateTo: options.dateRange?.end
+                }, {
                     signal: controller.signal
                 });
 
                 this.abortControllers.delete(cacheKey);
 
-                // Calculate total
-                const data = response.data;
-                const total = Array.isArray(data)
-                    ? data.reduce((sum, item) => {
-                        const key = `${field}_${calculation}`;
-                        return sum + (item[key] || 0);
-                    }, 0)
-                    : data?.value || 0;
+                const result = response.data.data || [];
 
-                const result = { value: total };
-
-                // Cache the result
                 this._setCache(cacheKey, result);
 
                 return result;
             } catch (error) {
-                if (error.name === 'AbortError') {
-                    return null;
-                }
+                if (error.name === "AbortError") return null;
                 throw error;
             }
         });
     }
-
     /**
-     * Fetch chart data with caching
+     * Fetch multiple chart series in one request
      */
-    async fetchChartData(department, config, period, options = {}) {
-        const cacheKey = `chart_${department}_${JSON.stringify(config)}_${period}_${JSON.stringify(options.dateRange)}`;
+    async fetchBatchChartData(department, chartConfigs, options = {}) {
+        const cacheKey = `batch_chart_${department}_${JSON.stringify(chartConfigs)}_${JSON.stringify(options.dateRange)}`;
 
         const cached = this._getCached(cacheKey);
         if (cached) return cached;
@@ -184,89 +139,45 @@ class PreviewDataService {
             this.abortControllers.set(cacheKey, controller);
 
             try {
-                const yAxes = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
-
-                const metrics = yAxes.map((field) => ({
-                    field,
-                    aggregation: config.aggregation || 'sum'
-                }));
-
-                const response = await api.get(`/${department}/data/aggregated`, {
-                    params: {
-                        dateFrom: options.dateRange?.start,
-                        dateTo: options.dateRange?.end,
-                        groupBy: config.xAxis || 'date',
-                        metrics: JSON.stringify(metrics)
-                    },
-                    signal: controller.signal
-                });
-
-                this.abortControllers.delete(cacheKey);
-
-                const rawData = Array.isArray(response.data) ? response.data : [];
-
-                const normalized = rawData.map((item) => {
-                    const result = {
-                        [config.xAxis || 'date']: item[config.xAxis || 'date']
-                    };
-
-                    yAxes.forEach((field) => {
-                        const key = `${field}_${config.aggregation || 'sum'}`;
-                        result[field] = item[key] ?? 0;
+                // Extract all metrics from chart configs
+                const metrics = [];
+                chartConfigs.forEach(config => {
+                    const yAxes = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
+                    yAxes.forEach(field => {
+                        metrics.push({
+                            field,
+                            aggregation: config.aggregation || 'sum',
+                            chartId: config.id
+                        });
                     });
-
-                    return result;
                 });
 
-                this._setCache(cacheKey, normalized);
-                return normalized;
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    return null;
-                }
-                throw error;
-            }
-        });
-    }
-
-    async fetchPieData(department, fields = [], period, options = {}) {
-        const cacheKey = `pie_${department}_${JSON.stringify(fields)}_${period}_${JSON.stringify(options.dateRange)}`;
-
-        const cached = this._getCached(cacheKey);
-        if (cached) return cached;
-
-        return this._debounce(cacheKey, async () => {
-            this._cancelPreviousRequest(cacheKey);
-
-            const controller = new AbortController();
-            this.abortControllers.set(cacheKey, controller);
-
-            try {
-                const response = await api.get(`/${department}/data`, {
-                    params: {
-                        limit: 1000,
-                        dateFrom: options.dateRange?.start,
-                        dateTo: options.dateRange?.end,
-                    },
+                const response = await api.post(`/${department}/data/batch-chart`, {
+                    metrics,
+                    dateFrom: options.dateRange?.start,
+                    dateTo: options.dateRange?.end,
+                    groupBy: 'date'
+                }, {
                     signal: controller.signal
                 });
 
                 this.abortControllers.delete(cacheKey);
 
-                const rows = Array.isArray(response.data)
-                    ? response.data
-                    : response.data?.data || [];
-
-                const pieData = fields.map((field) => {
-                    const value = rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
-                    return {
-                        name: field,
-                        value
-                    };
+                // Organize data by chart ID
+                const organized = {};
+                chartConfigs.forEach(config => {
+                    const yAxes = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
+                    organized[config.id] = response.data.data.map(point => {
+                        const dataPoint = { date: point.date };
+                        yAxes.forEach(field => {
+                            dataPoint[field] = point[field] || 0;
+                        });
+                        return dataPoint;
+                    });
                 });
 
-                this._setCache(cacheKey, pieData);
-                return pieData;
+                this._setCache(cacheKey, organized);
+                return organized;
             } catch (error) {
                 if (error.name === 'AbortError') {
                     return null;
@@ -275,9 +186,72 @@ class PreviewDataService {
             }
         });
     }
-    /**
-     * Clear cache for a department
-     */
+
+    // Keep your existing methods but make them use the batch endpoint
+    async fetchMetrics(department, field, calculation, period, options = {}) {
+        const results = await this.fetchBatchMetrics(department, [
+            { field, calculation }
+        ], options);
+
+        return { value: results?.[`${field}_${calculation}`] || 0 };
+    }
+
+    async fetchChartData(department, config, period, options = {}) {
+        const results = await this.fetchBatchChartData(department, [{
+            ...config,
+            id: 'default'
+        }], options);
+
+        return results?.default || [];
+    }
+
+    // Cache helpers
+    _getCached(key) {
+        if (this.requestCache.has(key)) {
+            const cached = this.requestCache.get(key);
+            if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+                return cached.data;
+            }
+            this.requestCache.delete(key);
+        }
+        return null;
+    }
+
+    _setCache(key, data) {
+        this.requestCache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    async _debounce(key, fn, delay = 300) {
+        if (this.pendingRequests.has(key)) {
+            return this.pendingRequests.get(key);
+        }
+
+        const promise = new Promise(async (resolve, reject) => {
+            setTimeout(async () => {
+                try {
+                    const result = await fn();
+                    this.pendingRequests.delete(key);
+                    resolve(result);
+                } catch (error) {
+                    this.pendingRequests.delete(key);
+                    reject(error);
+                }
+            }, delay);
+        });
+
+        this.pendingRequests.set(key, promise);
+        return promise;
+    }
+
+    _cancelPreviousRequest(key) {
+        if (this.abortControllers.has(key)) {
+            this.abortControllers.get(key).abort();
+        }
+    }
+
     clearCache(department) {
         for (const key of this.requestCache.keys()) {
             if (key.includes(department)) {

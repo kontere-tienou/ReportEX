@@ -347,19 +347,30 @@ function ChartPreview({ component, department, period, dateRange }) {
     );
 }
 
-// Table Preview with real data
+// Table Preview with real data - optimized version
 function TablePreview({ component, department, period, dateRange }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [data, setData] = useState([]);
+    const [tableCache, setTableCache] = useState({}); // Simple cache for tables
 
     useEffect(() => {
         loadTableData();
-    }, [component, department, period, dateRange]);
+    }, [component, department, period, dateRange?.start, dateRange?.end]);
 
     const loadTableData = async () => {
         setLoading(true);
         setError(null);
+
+        // Create cache key
+        const cacheKey = `${department}_${dateRange?.start}_${dateRange?.end}_${component.config.limit || 10}`;
+
+        // Check cache first
+        if (tableCache[cacheKey]) {
+            setData(tableCache[cacheKey]);
+            setLoading(false);
+            return;
+        }
 
         try {
             const response = await previewDataService.fetchPreviewData(department, {
@@ -372,9 +383,16 @@ function TablePreview({ component, department, period, dateRange }) {
                 ? response
                 : response?.data || [];
 
+            // Update cache
+            setTableCache(prev => ({
+                ...prev,
+                [cacheKey]: rows
+            }));
+
             setData(rows);
 
         } catch (err) {
+            console.error('Table data error:', err);
             setError('Impossible de charger les données du tableau');
         } finally {
             setLoading(false);
@@ -434,7 +452,6 @@ function TablePreview({ component, department, period, dateRange }) {
         </div>
     );
 }
-
 // Text Preview (static - no data needed)
 function TextPreview({ component }) {
     const { content } = component.config;
