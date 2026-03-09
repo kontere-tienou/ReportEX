@@ -16,7 +16,8 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
 import { previewDataService } from '../services/previewService.js';
-import { formatCellValue } from './utils/tableFormaterUtils.js';
+import {formatCellValue, formatDateValue} from './utils/tableFormaterUtils.js';
+import {KPIBlock} from "./components/index.js";
 
 const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
@@ -140,36 +141,10 @@ function MetricPreview({ component, department, period, dateRange }) {
         };
     };
 
-    const formatValue = (val) => {
-        const { format = 'number' } = component.config;
+     const formatValue = (val) => {
+        const { field } = component.config;
 
-        if (val === null || val === undefined) return '—';
-
-        try {
-            switch(format) {
-                case 'currency':
-                    return new Intl.NumberFormat('fr-FR', {
-                        style: 'currency',
-                        currency: 'XOF',
-                        maximumFractionDigits: 0
-                    }).format(val);
-                case 'percent':
-                    return new Intl.NumberFormat('fr-FR', {
-                        style: 'percent',
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1
-                    }).format(val / 100);
-                case 'decimal':
-                    return new Intl.NumberFormat('fr-FR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }).format(val);
-                default:
-                    return new Intl.NumberFormat('fr-FR').format(val);
-            }
-        } catch (e) {
-            return val.toString();
-        }
+        return formatCellValue(val, field);
     };
 
     if (loading) return <LoadingPreview />;
@@ -274,15 +249,22 @@ function ChartPreview({ component, department, period, dateRange }) {
                     {chartType === 'bar' && (
                         <BarChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey={xAxis} />
+                            <XAxis
+                                dataKey={xAxis}
+                                tickFormatter={(value) => formatDateValue(value)}
+                            />
                             <YAxis />
-                            <Tooltip />
+                            <Tooltip
+                                formatter={(value, name) => formatCellValue(value, name)}
+                                labelFormatter={(label) => formatDateValue(label)}
+                            />
                             <Legend />
                             {Array.isArray(yAxis) ? (
                                 yAxis.map((axis, index) => (
                                     <Bar
                                         key={axis}
                                         dataKey={axis}
+                                        tickFormatter={(value) => formatDateValue(value)}
                                         fill={COLORS[index % COLORS.length]}
                                         name={labels?.[index] || axis}
                                     />
@@ -308,7 +290,10 @@ function ChartPreview({ component, department, period, dateRange }) {
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip />
+                            <Tooltip
+                                formatter={(value, name) => formatCellValue(value, name)}
+                                labelFormatter={(label) => formatDateValue(label)}
+                            />
                             <Legend />
                         </PieChart>
                     )}
@@ -316,9 +301,15 @@ function ChartPreview({ component, department, period, dateRange }) {
                     {chartType === 'line' && (
                         <LineChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey={xAxis} />
+                            <XAxis
+                                dataKey={xAxis}
+                                tickFormatter={(value) => formatDateValue(value)}
+                            />
                             <YAxis />
-                            <Tooltip />
+                            <Tooltip
+                                formatter={(value, name) => formatCellValue(value, name)}
+                                labelFormatter={(label) => formatDateValue(label)}
+                            />
                             <Legend />
                             {Array.isArray(yAxis) ? (
                                 yAxis.map((axis, index) => (
@@ -465,6 +456,8 @@ function TextPreview({ component }) {
     );
 }
 
+
+
 // Main Component Preview
 export default function ComponentPreview({
                                              component,
@@ -493,7 +486,15 @@ export default function ComponentPreview({
                     dateRange={effectiveDateRange}
                 />
             );
-
+        case "kpi":
+            return (
+                <KPIBlock
+                    component={component}
+                    department={department}
+                    period={period}
+                    dateRange={effectiveDateRange}
+                />
+            );
         case 'chart':
             return (
                 <ChartPreview

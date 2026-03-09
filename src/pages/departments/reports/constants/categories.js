@@ -8,4 +8,5 @@ export const categories = [
     { id: 'table', label: 'Tableaux', icon: Table2 },
     { id: 'text', label: 'Texte', icon: FileText },
     {id: 'text-aerea', label: 'Text Aerea', icon: FileText },
+    {id: 'kpi', label: 'KPI', icon: FileText },
 ];

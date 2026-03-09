@@ -3,6 +3,7 @@ import {
     TextBlock,
     TableBlock,
     ChartBlock,
+    KPIBlock,
 } from './components';
 import useComponentProcessor from './hooks/useComponentProcessor';
 import { useMemo } from 'react';
@@ -12,6 +13,8 @@ const componentMap = {
     chart: ChartBlock,
     table: TableBlock,
     text: TextBlock,
+    kpi: KPIBlock,
+    //pie: PieBlock
 };
 
 const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
@@ -45,6 +48,9 @@ const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
                     processedData = processTableData(data, component.config);
                     break;
                 case 'text':
+                    processedData = component.config?.content || '';
+                    break;
+                case 'text-aerea':
                     processedData = component.config?.content || '';
                     break;
                 default:
