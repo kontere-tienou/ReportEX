@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import {useAuth} from "../context/AuthContext.jsx";
-import {reportService} from "../pages/departments/reports/services/reportApi.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { reportService } from "../pages/departments/reports/services/reportApi.js";
 
 // Composant générique de dashboard qui s'adapte à chaque département
 const GenericDepartmentDashboard = ({
@@ -17,14 +17,34 @@ const GenericDepartmentDashboard = ({
 
     useEffect(() => {
         loadDashboardData();
-    }, []);
+    }, [user?.department_id]); // ✅ FIX: Add dependency
 
     const loadDashboardData = async () => {
+        // ✅ FIX: Check if user and department_id exist
+        if (!user?.department_id) {
+            console.warn('No department_id found for user:', user);
+            setLoading(false);
+            return;
+        }
+
         try {
-            const statsRes = await reportService.getDepartmentStats();
-            setStats(statsRes.data.stats);
+            // ✅ FIX: Pass department_id explicitly
+            const statsRes = await reportService.getDepartmentStats(user.department_id);
+            const statsData = statsRes.data?.stats || statsRes.data?.data?.stats || {};
+
+            setStats(statsData);
         } catch (error) {
-            console.error('Erreur:', error);
+            console.error('Erreur chargement dashboard:', error);
+            // ✅ FIX: Set empty stats on error
+            setStats({
+                total_reports: 0,
+                validated_reports: 0,
+                pending_reports: 0,
+                draft_reports: 0,
+                rejected_reports: 0,
+                validation_rate: 0,
+                rejection_rate: 0
+            });
         } finally {
             setLoading(false);
         }
@@ -38,6 +58,17 @@ const GenericDepartmentDashboard = ({
         );
     }
 
+    // ✅ FIX: Handle missing stats
+    if (!stats) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-center">
+                    <p className="text-gray-600">Aucune donnée disponible</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {/* En-tête */}
@@ -46,7 +77,7 @@ const GenericDepartmentDashboard = ({
                 style={{ background: `linear-gradient(to right, ${departmentColor}, ${departmentColor}dd)` }}
             >
                 <div className="flex items-center space-x-3">
-                    <Icon className="w-10 h-10" />
+                    {Icon && <Icon className="w-10 h-10" />}
                     <div>
                         <h1 className="text-3xl font-bold">Dashboard {departmentName}</h1>
                         <p className="opacity-90">{description}</p>
@@ -55,34 +86,38 @@ const GenericDepartmentDashboard = ({
             </div>
 
             {/* KPIs personnalisés */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {metrics.map((metric, index) => (
-                    <div
-                        key={index}
-                        className="bg-white rounded-lg shadow p-6"
-                        style={{ borderLeft: `4px solid ${metric.color}` }}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-gray-600 text-sm mb-1">{metric.label}</p>
-                                <p className="text-3xl font-bold text-gray-900">{metric.value}</p>
-                                {metric.subtext && (
-                                    <p className="text-xs text-gray-500 mt-1">{metric.subtext}</p>
-                                )}
-                            </div>
-                            <div
-                                className="p-3 rounded-full"
-                                style={{ backgroundColor: `${metric.color}20` }}
-                            >
-                                <metric.icon
-                                    className="w-8 h-8"
-                                    style={{ color: metric.color }}
-                                />
+            {metrics && metrics.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {metrics.map((metric, index) => (
+                        <div
+                            key={index}
+                            className="bg-white rounded-lg shadow p-6"
+                            style={{ borderLeft: `4px solid ${metric.color}` }}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-600 text-sm mb-1">{metric.label}</p>
+                                    <p className="text-3xl font-bold text-gray-900">{metric.value}</p>
+                                    {metric.subtext && (
+                                        <p className="text-xs text-gray-500 mt-1">{metric.subtext}</p>
+                                    )}
+                                </div>
+                                <div
+                                    className="p-3 rounded-full"
+                                    style={{ backgroundColor: `${metric.color}20` }}
+                                >
+                                    {metric.icon && (
+                                        <metric.icon
+                                            className="w-8 h-8"
+                                            style={{ color: metric.color }}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {/* Rapports du département */}
             <div className="bg-white rounded-lg shadow p-6">
@@ -99,19 +134,19 @@ const GenericDepartmentDashboard = ({
                             className="text-2xl font-bold"
                             style={{ color: departmentColor }}
                         >
-                            {stats?.total_reports || 0}
+                            {parseInt(stats?.total_reports) || 0}
                         </p>
                     </div>
                     <div className="p-4 border-2 border-green-200 rounded-lg">
                         <p className="text-sm text-gray-600 mb-1">Validés</p>
                         <p className="text-2xl font-bold text-green-600">
-                            {stats?.validated_reports || 0}
+                            {parseInt(stats?.validated_reports) || 0}
                         </p>
                     </div>
                     <div className="p-4 border-2 border-amber-200 rounded-lg">
                         <p className="text-sm text-gray-600 mb-1">En Attente</p>
                         <p className="text-2xl font-bold text-amber-600">
-                            {stats?.pending_reports || 0}
+                            {parseInt(stats?.pending_reports) || 0}
                         </p>
                     </div>
                 </div>
@@ -124,10 +159,10 @@ const GenericDepartmentDashboard = ({
                 </h2>
                 <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={[
-                        { name: 'Brouillons', value: parseInt(stats?.draft_reports || 0) },
-                        { name: 'Soumis', value: parseInt(stats?.pending_reports || 0) },
-                        { name: 'Validés', value: parseInt(stats?.validated_reports || 0) },
-                        { name: 'Rejetés', value: parseInt(stats?.rejected_reports || 0) },
+                        { name: 'Brouillons', value: parseInt(stats?.draft_reports) || 0 },
+                        { name: 'Soumis', value: parseInt(stats?.pending_reports) || 0 },
+                        { name: 'Validés', value: parseInt(stats?.validated_reports) || 0 },
+                        { name: 'Rejetés', value: parseInt(stats?.rejected_reports) || 0 },
                     ]}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
@@ -171,9 +206,9 @@ const GenericDepartmentDashboard = ({
                         💡 Informations
                     </h3>
                     <ul className="space-y-2 text-sm text-blue-800">
-                        <li>• Taux de validation: {stats?.validation_rate || 0}%</li>
-                        <li>• Taux de rejet: {stats?.rejection_rate || 0}%</li>
-                        <li>• Total rapports ce mois: {stats?.total_reports || 0}</li>
+                        <li>• Taux de validation: {parseInt(stats?.validation_rate) || 0}%</li>
+                        <li>• Taux de rejet: {parseInt(stats?.rejection_rate) || 0}%</li>
+                        <li>• Total rapports ce mois: {parseInt(stats?.total_reports) || 0}</li>
                     </ul>
                 </div>
             </div>

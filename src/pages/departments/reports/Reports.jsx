@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
@@ -20,7 +20,7 @@ import {
     Lock,
     Wand2,
 } from "lucide-react";
-import {reportService} from "./services/reportApi.js";
+import { reportService } from "./services/reportApi.js";
 
 const statusBadgeMap = {
     brouillon: { bg: "bg-gray-100", text: "text-gray-700", icon: Clock },
@@ -35,9 +35,9 @@ const StatusBadge = ({ status }) => {
 
     return (
         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-      <Icon className="w-4 h-4 mr-1" />
+            <Icon className="w-4 h-4 mr-1" />
             {status?.charAt(0).toUpperCase() + status?.slice(1)}
-    </span>
+        </span>
     );
 };
 
@@ -47,9 +47,10 @@ export default function Reports() {
     const { user } = useAuth();
 
     const isDirection = useMemo(() => {
-        return ["DG"].includes(user?.role?.toUpperCase());
+        return ["DG", "ADMIN"].includes(user?.role?.toUpperCase());
     }, [user?.role]);
 
+    // ✅ FIX: Initialize as empty array
     const [reports, setReports] = useState([]);
     const [departmentStats, setDepartmentStats] = useState({
         total: 0,
@@ -59,16 +60,13 @@ export default function Reports() {
         rejete: 0,
     });
 
-
-
-
     const [loading, setLoading] = useState(true);
-    //const [filter, setFilter] = useState("mes-rapports");
     const [filter, setFilter] = useState(isDirection ? "tous" : "mes-rapports");
     const [view, setView] = useState("grid");
     const [searchTerm, setSearchTerm] = useState("");
 
-    const loadDepartmentStats = async () => {
+    // ✅ FIX: useCallback pour éviter re-création
+    const loadDepartmentStats = useCallback(async () => {
         if (!isDirection || !user?.department_id) return;
 
         try {
@@ -85,9 +83,10 @@ export default function Reports() {
         } catch (e) {
             console.error("Erreur stats département:", e);
         }
-    };
+    }, [isDirection, user?.department_id]);
 
-    /*const loadReports = async () => {
+    // ✅ FIX: useCallback + gestion erreurs + ensure array
+    const loadReports = useCallback(async () => {
         setLoading(true);
         try {
             const params = {};
@@ -97,73 +96,34 @@ export default function Reports() {
 
             if (filter === "mes-rapports") {
                 const res = await reportService.getMy(params);
-                reportsData = res.data?.data?.reports || res.data?.reports || [];
+                const data = res.data?.data?.reports || res.data?.reports || res.data;
+                reportsData = Array.isArray(data) ? data : [];
             } else if (filter === "tous") {
                 if (isDirection) {
                     const res = await reportService.getAll(params);
-                    reportsData = res.data?.data?.reports || res.data?.reports || [];
+                    const data = res.data?.data?.reports || res.data?.reports || res.data;
+                    reportsData = Array.isArray(data) ? data : [];
                 } else {
-                    const [myRes, deptRes] = await Promise.all([
-                        reportService.getMy(params),
-                        reportService.getAll({
-                            ...params,
-                            department_id: user.department_id,
-                            visibility: "department",
-                        }).catch(() => ({ data: { reports: [] } })),
-                    ]);
-                    const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
-                    const deptReports = deptRes.data?.data?.reports || deptRes.data?.reports || [];
-
-                    const combined = [...myReports];
-                    deptReports.forEach((dr) => {
-                        if (!combined.find((mr) => mr.id === dr.id)) {
-                            combined.push(dr);
-                        }
-                    });
-
-                    reportsData = combined;
-                }
-            } else {
-                params.status = filter;
-                const res = isDirection
-                    ? await reportService.getAll(params)
-                    : await reportService.getMy(params);
-                reportsData = res.data?.data?.reports || res.data?.reports || [];
-            }
-
-            setReports(reportsData);
-        } catch (e) {
-            console.error("Erreur chargement rapports:", e);
-        } finally {
-            setLoading(false);
-        }
-    };*/
-    const loadReports = async () => {
-        setLoading(true);
-        try {
-            const params = {};
-            if (searchTerm) params.search = searchTerm;
-
-            let reportsData = [];
-
-            if (filter === "mes-rapports") {
-                const res = await reportService.getMy(params);
-                reportsData = res.data?.data?.reports || res.data?.reports || [];
-            } else if (filter === "tous") {
-                if (isDirection) {
-                    const res = await reportService.getAll(params);
-                    reportsData = res.data?.data?.reports || res.data?.reports || [];
-                } else {
-                    const [myRes, publicRes] = await Promise.all([
+                    // ✅ FIX: Parallel requests avec error handling
+                    const [myRes, publicRes] = await Promise.allSettled([
                         reportService.getMy(params),
                         reportService.getAll({ ...params, visibility: "public" }),
                     ]);
 
-                    const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
-                    const publicReports = publicRes.data?.data?.reports || publicRes.data?.reports || [];
+                    const myReports = myRes.status === 'fulfilled'
+                        ? (myRes.value.data?.data?.reports || myRes.value.data?.reports || myRes.value.data || [])
+                        : [];
 
-                    const combined = [...myReports];
-                    publicReports.forEach((pr) => {
+                    const publicReports = publicRes.status === 'fulfilled'
+                        ? (publicRes.value.data?.data?.reports || publicRes.value.data?.reports || publicRes.value.data || [])
+                        : [];
+
+                    // ✅ Ensure arrays
+                    const myArray = Array.isArray(myReports) ? myReports : [];
+                    const publicArray = Array.isArray(publicReports) ? publicReports : [];
+
+                    const combined = [...myArray];
+                    publicArray.forEach((pr) => {
                         if (!combined.find((r) => r.id === pr.id)) {
                             combined.push(pr);
                         }
@@ -172,22 +132,32 @@ export default function Reports() {
                     reportsData = combined;
                 }
             } else {
+                // Filter by status
                 params.status = filter;
 
                 if (isDirection) {
                     const res = await reportService.getAll(params);
-                    reportsData = res.data?.data?.reports || res.data?.reports || [];
+                    const data = res.data?.data?.reports || res.data?.reports || res.data;
+                    reportsData = Array.isArray(data) ? data : [];
                 } else {
-                    const [myRes, publicRes] = await Promise.all([
+                    const [myRes, publicRes] = await Promise.allSettled([
                         reportService.getMy(params),
                         reportService.getAll({ ...params, status: filter, visibility: "public" }),
                     ]);
 
-                    const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
-                    const publicReports = publicRes.data?.data?.reports || publicRes.data?.reports || [];
+                    const myReports = myRes.status === 'fulfilled'
+                        ? (myRes.value.data?.data?.reports || myRes.value.data?.reports || myRes.value.data || [])
+                        : [];
 
-                    const combined = [...myReports];
-                    publicReports.forEach((pr) => {
+                    const publicReports = publicRes.status === 'fulfilled'
+                        ? (publicRes.value.data?.data?.reports || publicRes.value.data?.reports || publicRes.value.data || [])
+                        : [];
+
+                    const myArray = Array.isArray(myReports) ? myReports : [];
+                    const publicArray = Array.isArray(publicReports) ? publicReports : [];
+
+                    const combined = [...myArray];
+                    publicArray.forEach((pr) => {
                         if (!combined.find((r) => r.id === pr.id)) {
                             combined.push(pr);
                         }
@@ -197,24 +167,37 @@ export default function Reports() {
                 }
             }
 
-            setReports(reportsData);
+            // ✅ FIX: Ensure final result is array
+            setReports(Array.isArray(reportsData) ? reportsData : []);
         } catch (e) {
             console.error("Erreur chargement rapports:", e);
+            // ✅ FIX: Set empty array on error
+            setReports([]);
         } finally {
             setLoading(false);
         }
-    };
-    useEffect(() => {
-        if (isDirection) {
-            loadDepartmentStats();
-        }
-        loadReports();
-    }, [filter, isDirection]);
+    }, [filter, isDirection, searchTerm]);
 
+    // ✅ FIX: Load on mount and filter change
     useEffect(() => {
-        const timer = setTimeout(() => loadReports(), 350);
+        if (user) {
+            if (isDirection) {
+                loadDepartmentStats();
+            }
+            loadReports();
+        }
+    }, [user, filter, isDirection, loadReports, loadDepartmentStats]);
+
+    // ✅ FIX: Debounce search with cleanup
+    useEffect(() => {
+        if (!user) return;
+
+        const timer = setTimeout(() => {
+            loadReports();
+        }, 350);
+
         return () => clearTimeout(timer);
-    }, [searchTerm]);
+    }, [searchTerm, user, loadReports]);
 
     const goDetails = (report) => {
         navigate(`/departments/${deptName}/reports/${report.id}`);
@@ -225,9 +208,9 @@ export default function Reports() {
     };
 
     const isReportAccessible = (report) => {
-        const isOwner = report.user_id === user.id;
+        const isOwner = report.user_id === user?.id;
         const isDG = isDirection;
-        const sameDept = report.department_id === user.department_id;
+        const sameDept = report.department_id === user?.department_id;
         const isPublic = report.visibility === "public";
         const isDepartment = report.visibility === "department";
 
@@ -236,6 +219,15 @@ export default function Reports() {
         if (isDepartment && sameDept) return true;
         return false;
     };
+
+    // ✅ FIX: Loading state while user not loaded
+    if (!user) {
+        return (
+            <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -257,12 +249,11 @@ export default function Reports() {
                             className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 font-medium hover:from-purple-700 hover:to-pink-700 shadow-lg"
                         >
                             <Wand2 className="w-5 h-5 mr-2" />
-                            Generer un rapport
+                            Générer un rapport
                         </button>
                     )}
                 </div>
             </div>
-
 
             {/* Banner Info */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
@@ -285,7 +276,6 @@ export default function Reports() {
                     <Filter className="w-5 h-5 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Afficher:</span>
 
-                    {/* Conditional filter buttons based on role */}
                     {!isDirection && (
                         <button
                             onClick={() => setFilter("mes-rapports")}
@@ -360,7 +350,7 @@ export default function Reports() {
                 <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
                 </div>
-            ) : reports.length === 0 ? (
+            ) : !Array.isArray(reports) || reports.length === 0 ? (
                 <div className="rounded-xl border bg-white p-10 text-center">
                     <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Aucun rapport</h3>
@@ -398,11 +388,11 @@ export default function Reports() {
                                         <div className="flex items-center gap-2 mb-2">
                                             <Building2 className="w-4 h-4 text-gray-500" />
                                             <span className="text-xs font-medium text-gray-600">
-                        {r.department_name || "—"}
-                      </span>
+                                                {r.department_name || "—"}
+                                            </span>
                                         </div>
                                         <h3 className="text-lg font-semibold text-gray-900">
-                                            Rapport #{r.id}
+                                            {r.title || `Rapport #${r.id}`}
                                         </h3>
                                     </div>
                                     <StatusBadge status={r.status} />
@@ -415,11 +405,11 @@ export default function Reports() {
                                     </div>
                                     <div className="flex items-center text-sm text-gray-600">
                                         <User2 className="w-4 h-4 mr-2" />
-                                        {r.author_name}
+                                        {r.author_name || "—"}
                                         {isOwner && (
                                             <span className="ml-2 text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">
-                        Vous
-                      </span>
+                                                Vous
+                                            </span>
                                         )}
                                     </div>
                                 </div>
@@ -427,8 +417,8 @@ export default function Reports() {
                                 <div className="flex items-center justify-between pt-3 border-t">
                                     <span className="text-xs text-gray-500 capitalize">{r.visibility}</span>
                                     <span className="text-sm font-medium text-cyan-600">
-                    {accessible ? "Voir détails →" : "Demander accès →"}
-                  </span>
+                                        {accessible ? "Voir détails →" : "Demander accès →"}
+                                    </span>
                                 </div>
                             </div>
                         );
@@ -440,6 +430,7 @@ export default function Reports() {
                         <thead className="bg-gray-50">
                         <tr>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ID</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Titre</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Département</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Auteur</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Période</th>
@@ -454,8 +445,9 @@ export default function Reports() {
                                 onClick={() => goDetails(r)}
                             >
                                 <td className="px-4 py-3 text-sm">#{r.id}</td>
-                                <td className="px-4 py-3 text-sm">{r.department_name}</td>
-                                <td className="px-4 py-3 text-sm">{r.author_name}</td>
+                                <td className="px-4 py-3 text-sm font-medium">{r.title || "—"}</td>
+                                <td className="px-4 py-3 text-sm">{r.department_name || "—"}</td>
+                                <td className="px-4 py-3 text-sm">{r.author_name || "—"}</td>
                                 <td className="px-4 py-3 text-sm">
                                     {new Date(r.period_start).toLocaleDateString()}
                                 </td>

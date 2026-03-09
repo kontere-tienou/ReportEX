@@ -369,7 +369,7 @@ export default function ReportDetails() {
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 
             {/* ── TOP BAR ── */}
-            <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm print:hidden">
+            <header className=" top-0 z-40 bg-white border-b border-slate-100 shadow-sm print:hidden">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <div className="flex items-center justify-between h-14 gap-3">
                         {/* Left */}
