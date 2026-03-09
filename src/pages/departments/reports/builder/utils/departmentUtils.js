@@ -5,25 +5,21 @@ import { departmentCodeMap } from './departmentMapping';
  * Resolve department code from multiple sources
  */
 export const resolveDepartmentCode = (deptName, user) => {
-    console.log('🔍 Resolving department code from:', { deptName, userDept: user?.department });
 
     // Priority 1: From URL with mapping
     if (deptName) {
         const mappedCode = departmentCodeMap[deptName.toLowerCase()];
         if (mappedCode) {
-            console.log('✅ Mapped from URL:', mappedCode);
             return mappedCode;
         }
         // Try uppercase directly
         const upperCode = deptName.toUpperCase();
-        console.log('✅ Using URL directly:', upperCode);
         return upperCode;
     }
 
     // Priority 2: From user object
     if (user?.department?.code) {
         const userCode = user.department.code.toUpperCase();
-        console.log('✅ Using user department code:', userCode);
         return userCode;
     }
 
@@ -34,7 +30,6 @@ export const resolveDepartmentCode = (deptName, user) => {
             ([key, value]) => value === user.department.name.toUpperCase()
         );
         if (reverseEntry) {
-            console.log('✅ Mapped from user department name:', reverseEntry[1]);
             return reverseEntry[1];
         }
     }

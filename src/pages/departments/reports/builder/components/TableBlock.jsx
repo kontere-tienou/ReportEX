@@ -36,7 +36,7 @@ export default function TableBlock({ component, data = [] }) {
                         <tr key={idx} className="hover:bg-gray-50">
                             {displayColumns.map((col) => (
                                 <td key={col} className="px-4 py-2 text-gray-900">
-                                    {row[col] || '—'}
+                                    {row[col] ?? '—'}
                                 </td>
                             ))}
                         </tr>

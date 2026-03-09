@@ -51,7 +51,6 @@ export default function Data() {
                 setSchemaLoading(false);
                 return;
             }
-
             // Validate the code
             const isValid = await validateDepartmentCode(deptCode);
             if (!isValid) {
@@ -59,7 +58,6 @@ export default function Data() {
                 setSchemaLoading(false);
                 return;
             }
-
             // Load schema
             await loadSchema();
         };
@@ -71,16 +69,11 @@ export default function Data() {
         setSchemaLoading(true);
         setError(null);
         try {
-            console.log('📥 Loading schema for department:', deptCode);
             const deptSchema = await schemaService.getDepartmentSchema(deptCode);
-
             if (!deptSchema) {
                 throw new Error('Schéma non trouvé');
             }
-
-            console.log('✅ Schema loaded:', deptSchema);
             setSchema(deptSchema);
-
             // Once schema is loaded, load data
             await loadData();
             await loadStats();
@@ -97,7 +90,6 @@ export default function Data() {
     const loadData = async () => {
         setLoading(true);
         try {
-            console.log('📥 Loading data for department:', deptCode);
             const data = await dataService.getAll(deptCode);
             setDataList(data);
         } catch (error) {
@@ -114,7 +106,6 @@ export default function Data() {
             setStats(statsData);
         } catch (error) {
             console.error('❌ Error loading stats:', error);
-            // Don't show toast for stats error
         }
     };
 
@@ -324,16 +315,13 @@ export default function Data() {
             <div className={`bg-gradient-to-r ${schema.color || 'from-cyan-600 to-blue-600'} rounded-xl p-6 text-white`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <div className="text-4xl">{schema.icon || '📊'}</div>
+                        <div className="text-4xl">{schema.icon}</div>
                         <div>
                             <h1 className="text-3xl font-bold">
                                 {schema.title || `Données ${departmentDisplayName}`}
                             </h1>
                             <p className="text-cyan-100 mt-1">
                                 {schema.description || `Gérez vos saisies pour ${departmentDisplayName}`}
-                            </p>
-                            <p className="text-xs text-cyan-200 mt-1">
-                                Code: {deptCode}
                             </p>
                         </div>
                     </div>

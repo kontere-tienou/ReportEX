@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
 import { previewDataService } from '../services/previewService.js';
+import { formatCellValue } from './utils/tableFormaterUtils.js';
 
 const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
@@ -77,12 +78,24 @@ function MetricPreview({ component, department, period, dateRange }) {
             setValue(currentData?.value || 0);
 
             // Calculate trend
-            if (currentData?.value && prevData?.value) {
-                const change = ((currentData.value - prevData.value) / prevData.value) * 100;
-                setTrend({
-                    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'stable',
-                    value: Math.abs(change).toFixed(1)
-                });
+            if (
+                currentData?.value !== null &&
+                currentData?.value !== undefined &&
+                prevData?.value !== null &&
+                prevData?.value !== undefined
+            ) {
+                if (prevData.value === 0) {
+                    setTrend({
+                        direction: currentData.value > 0 ? 'up' : 'stable',
+                        value: currentData.value > 0 ? '100.0' : '0.0'
+                    });
+                } else {
+                    const change = ((currentData.value - prevData.value) / prevData.value) * 100;
+                    setTrend({
+                        direction: change > 0 ? 'up' : change < 0 ? 'down' : 'stable',
+                        value: Math.abs(change).toFixed(1)
+                    });
+                }
             }
         } catch (err) {
             console.error('Error loading metric:', err);
@@ -362,7 +375,6 @@ function TablePreview({ component, department, period, dateRange }) {
             setData(rows);
 
         } catch (err) {
-            console.error('Error loading table data:', err);
             setError('Impossible de charger les données du tableau');
         } finally {
             setLoading(false);
@@ -411,10 +423,7 @@ function TablePreview({ component, department, period, dateRange }) {
                         <tr key={idx} className="hover:bg-gray-50">
                             {displayColumns.map((col) => (
                                 <td key={col} className="px-4 py-2 text-gray-600">
-                                    {typeof row[col] === 'number'
-                                        ? new Intl.NumberFormat('fr-FR').format(row[col])
-                                        : row[col] || '—'
-                                    }
+                                    {formatCellValue(row[col], col, { locale: 'fr-FR', dateStyle: 'short' })}
                                 </td>
                             ))}
                         </tr>

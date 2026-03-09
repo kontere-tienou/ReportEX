@@ -1,4 +1,3 @@
-// pages/departments/reports/builder/CustomReportRenderer.jsx
 import {
     MetricBlock,
     TextBlock,
@@ -15,11 +14,22 @@ const componentMap = {
     text: TextBlock,
 };
 
-const CustomReportRenderer = ({ layout = [], data }) => {
+const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
     const { processMetric, processChartData, processTableData } = useComponentProcessor();
 
     const processedComponents = useMemo(() => {
-        if (!data) return layout;
+        if (!layout || layout.length === 0) return [];
+
+        if (mode === 'snapshot') {
+            return layout;
+        }
+
+        if (!data) {
+            return layout.map(component => ({
+                ...component,
+                processedData: null,
+            }));
+        }
 
         return layout.map(component => {
             let processedData = null;
@@ -34,16 +44,19 @@ const CustomReportRenderer = ({ layout = [], data }) => {
                 case 'table':
                     processedData = processTableData(data, component.config);
                     break;
+                case 'text':
+                    processedData = component.config?.content || '';
+                    break;
                 default:
-                    processedData = data;
+                    processedData = null;
             }
 
             return {
                 ...component,
-                processedData
+                processedData,
             };
         });
-    }, [layout, data, processMetric, processChartData, processTableData]);
+    }, [layout, data, mode, processMetric, processChartData, processTableData]);
 
     if (!layout || layout.length === 0) {
         return (

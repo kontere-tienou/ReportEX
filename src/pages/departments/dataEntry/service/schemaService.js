@@ -10,26 +10,16 @@ export const schemaService = {
             if (!deptCode) {
                 throw new Error('Department code is required');
             }
-
             // Clean the department code
             const cleanCode = deptCode.trim().toUpperCase();
-
-            console.log('🔍 Fetching schema for department:', cleanCode);
-
             const response = await api.get(`/schemas/${cleanCode}`);
 
             if (!response.data) {
                 throw new Error('No schema data received');
             }
-
-            console.log('✅ Schema loaded:', response.data);
             return response.data;
-
         } catch (error) {
             console.error('❌ Error fetching schema:', error);
-
-            // Don't use fallback for data pages - throw the error
-            // This will help us identify missing schemas
             throw new Error(`Schema not found for department: ${deptCode}`);
         }
     },

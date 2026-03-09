@@ -942,17 +942,11 @@ export const useBuilderToolbar = ({ departmentCode, onAddComponent, user }) => {
             setError(null);
 
             try {
-                console.log('Loading schema for department:', departmentCode);
-                console.log('Current user:', user.email);
-
                 const deptSchema = await schemaService.getDepartmentSchema(departmentCode);
-
                 if (!deptSchema) {
                     throw new Error('Schéma non trouvé');
                 }
-
                 setSchema(deptSchema);
-
                 const components = generateComponents(departmentCode, deptSchema);
                 setAvailableComponents(components);
 

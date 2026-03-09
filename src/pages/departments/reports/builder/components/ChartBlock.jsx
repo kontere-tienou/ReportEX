@@ -11,7 +11,7 @@ import useComponentProcessor from '../hooks/useComponentProcessor';
 const COLORS = ['#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'];
 
 export default function ChartBlock({ component, data }) {
-    const { chartType = "bar", title, xAxis, yAxis } = component.config;
+    const { chartType = "bar", title, xAxis, yAxis, labels } = component.config;
     const { processChartData } = useComponentProcessor();
     const [chartData, setChartData] = useState([]);
 
@@ -30,6 +30,8 @@ export default function ChartBlock({ component, data }) {
         );
     }
 
+    const yAxes = Array.isArray(yAxis) ? yAxis : [yAxis || 'value'];
+
     const renderChart = () => {
         switch (chartType) {
             case 'bar':
@@ -40,7 +42,14 @@ export default function ChartBlock({ component, data }) {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey={yAxis || 'value'} fill="#06b6d4" />
+                        {yAxes.map((axis, index) => (
+                            <Bar
+                                key={axis}
+                                dataKey={axis}
+                                fill={COLORS[index % COLORS.length]}
+                                name={labels?.[index] || axis}
+                            />
+                        ))}
                     </BarChart>
                 );
 
@@ -52,7 +61,16 @@ export default function ChartBlock({ component, data }) {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey={yAxis || 'value'} stroke="#06b6d4" />
+                        {yAxes.map((axis, index) => (
+                            <Line
+                                key={axis}
+                                type="monotone"
+                                dataKey={axis}
+                                stroke={COLORS[index % COLORS.length]}
+                                strokeWidth={2}
+                                name={labels?.[index] || axis}
+                            />
+                        ))}
                     </LineChart>
                 );
 
@@ -61,7 +79,7 @@ export default function ChartBlock({ component, data }) {
                     <PieChart>
                         <Pie
                             data={chartData}
-                            dataKey={yAxis || 'value'}
+                            dataKey={yAxes[0]}
                             nameKey={xAxis || 'name'}
                             cx="50%"
                             cy="50%"

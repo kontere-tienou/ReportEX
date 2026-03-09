@@ -4,7 +4,7 @@ class PreviewDataService {
     constructor() {
         this.requestCache = new Map();
         this.abortControllers = new Map();
-        this.CACHE_TTL = 30 * 1000; // 30 seconds
+        this.CACHE_TTL = 30 * 1000;
         this.pendingRequests = new Map();
     }
 
@@ -14,7 +14,6 @@ class PreviewDataService {
     async _debounce(key, fn, delay = 300) {
         // Check if there's a pending request
         if (this.pendingRequests.has(key)) {
-            console.log(`⏳ Debouncing: ${key}`);
             return this.pendingRequests.get(key);
         }
 
@@ -43,7 +42,6 @@ class PreviewDataService {
         if (this.requestCache.has(key)) {
             const cached = this.requestCache.get(key);
             if (Date.now() - cached.timestamp < this.CACHE_TTL) {
-                console.log(`📦 Cache hit: ${key}`);
                 return cached.data;
             }
             this.requestCache.delete(key);
@@ -66,7 +64,6 @@ class PreviewDataService {
      */
     _cancelPreviousRequest(key) {
         if (this.abortControllers.has(key)) {
-            console.log(`🛑 Cancelling previous request: ${key}`);
             this.abortControllers.get(key).abort();
         }
     }
@@ -109,7 +106,6 @@ class PreviewDataService {
                 return response.data;
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    console.log('Request cancelled:', cacheKey);
                     return null;
                 }
                 throw error;
@@ -165,7 +161,6 @@ class PreviewDataService {
                 return result;
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    console.log('Request cancelled:', cacheKey);
                     return null;
                 }
                 throw error;
@@ -179,11 +174,9 @@ class PreviewDataService {
     async fetchChartData(department, config, period, options = {}) {
         const cacheKey = `chart_${department}_${JSON.stringify(config)}_${period}_${JSON.stringify(options.dateRange)}`;
 
-        // Check cache
         const cached = this._getCached(cacheKey);
         if (cached) return cached;
 
-        // Debounce
         return this._debounce(cacheKey, async () => {
             this._cancelPreviousRequest(cacheKey);
 
@@ -191,12 +184,13 @@ class PreviewDataService {
             this.abortControllers.set(cacheKey, controller);
 
             try {
-                const metrics = [{
-                    field: config.yAxis,
-                    aggregation: config.aggregation || 'sum'
-                }];
+                const yAxes = Array.isArray(config.yAxis) ? config.yAxis : [config.yAxis];
 
-                // FIX: Remove the extra /api/ from the URL
+                const metrics = yAxes.map((field) => ({
+                    field,
+                    aggregation: config.aggregation || 'sum'
+                }));
+
                 const response = await api.get(`/${department}/data/aggregated`, {
                     params: {
                         dateFrom: options.dateRange?.start,
@@ -209,13 +203,25 @@ class PreviewDataService {
 
                 this.abortControllers.delete(cacheKey);
 
-                // Cache the result
-                this._setCache(cacheKey, response.data);
+                const rawData = Array.isArray(response.data) ? response.data : [];
 
-                return response.data;
+                const normalized = rawData.map((item) => {
+                    const result = {
+                        [config.xAxis || 'date']: item[config.xAxis || 'date']
+                    };
+
+                    yAxes.forEach((field) => {
+                        const key = `${field}_${config.aggregation || 'sum'}`;
+                        result[field] = item[key] ?? 0;
+                    });
+
+                    return result;
+                });
+
+                this._setCache(cacheKey, normalized);
+                return normalized;
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    console.log('Request cancelled:', cacheKey);
                     return null;
                 }
                 throw error;
@@ -223,6 +229,52 @@ class PreviewDataService {
         });
     }
 
+    async fetchPieData(department, fields = [], period, options = {}) {
+        const cacheKey = `pie_${department}_${JSON.stringify(fields)}_${period}_${JSON.stringify(options.dateRange)}`;
+
+        const cached = this._getCached(cacheKey);
+        if (cached) return cached;
+
+        return this._debounce(cacheKey, async () => {
+            this._cancelPreviousRequest(cacheKey);
+
+            const controller = new AbortController();
+            this.abortControllers.set(cacheKey, controller);
+
+            try {
+                const response = await api.get(`/${department}/data`, {
+                    params: {
+                        limit: 1000,
+                        dateFrom: options.dateRange?.start,
+                        dateTo: options.dateRange?.end,
+                    },
+                    signal: controller.signal
+                });
+
+                this.abortControllers.delete(cacheKey);
+
+                const rows = Array.isArray(response.data)
+                    ? response.data
+                    : response.data?.data || [];
+
+                const pieData = fields.map((field) => {
+                    const value = rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
+                    return {
+                        name: field,
+                        value
+                    };
+                });
+
+                this._setCache(cacheKey, pieData);
+                return pieData;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    return null;
+                }
+                throw error;
+            }
+        });
+    }
     /**
      * Clear cache for a department
      */

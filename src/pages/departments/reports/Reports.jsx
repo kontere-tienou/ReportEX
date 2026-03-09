@@ -69,7 +69,7 @@ export default function Reports() {
     const [searchTerm, setSearchTerm] = useState("");
 
     const loadDepartmentStats = async () => {
-        if (!user?.department_id) return;
+        if (!isDirection || !user?.department_id) return;
 
         try {
             const res = await reportService.getDepartmentStats(user.department_id);
@@ -87,7 +87,7 @@ export default function Reports() {
         }
     };
 
-    const loadReports = async () => {
+    /*const loadReports = async () => {
         setLoading(true);
         try {
             const params = {};
@@ -104,14 +104,13 @@ export default function Reports() {
                     reportsData = res.data?.data?.reports || res.data?.reports || [];
                 } else {
                     const [myRes, deptRes] = await Promise.all([
-                        reportService.getMyReports(params),
-                        reportService.getAllReports({
+                        reportService.getMy(params),
+                        reportService.getAll({
                             ...params,
                             department_id: user.department_id,
                             visibility: "department",
                         }).catch(() => ({ data: { reports: [] } })),
                     ]);
-
                     const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
                     const deptReports = deptRes.data?.data?.reports || deptRes.data?.reports || [];
 
@@ -127,8 +126,8 @@ export default function Reports() {
             } else {
                 params.status = filter;
                 const res = isDirection
-                    ? await reportService.getAllReports(params)
-                    : await reportService.getMyReports(params);
+                    ? await reportService.getAll(params)
+                    : await reportService.getMy(params);
                 reportsData = res.data?.data?.reports || res.data?.reports || [];
             }
 
@@ -138,10 +137,77 @@ export default function Reports() {
         } finally {
             setLoading(false);
         }
-    };
+    };*/
+    const loadReports = async () => {
+        setLoading(true);
+        try {
+            const params = {};
+            if (searchTerm) params.search = searchTerm;
 
+            let reportsData = [];
+
+            if (filter === "mes-rapports") {
+                const res = await reportService.getMy(params);
+                reportsData = res.data?.data?.reports || res.data?.reports || [];
+            } else if (filter === "tous") {
+                if (isDirection) {
+                    const res = await reportService.getAll(params);
+                    reportsData = res.data?.data?.reports || res.data?.reports || [];
+                } else {
+                    const [myRes, publicRes] = await Promise.all([
+                        reportService.getMy(params),
+                        reportService.getAll({ ...params, visibility: "public" }),
+                    ]);
+
+                    const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
+                    const publicReports = publicRes.data?.data?.reports || publicRes.data?.reports || [];
+
+                    const combined = [...myReports];
+                    publicReports.forEach((pr) => {
+                        if (!combined.find((r) => r.id === pr.id)) {
+                            combined.push(pr);
+                        }
+                    });
+
+                    reportsData = combined;
+                }
+            } else {
+                params.status = filter;
+
+                if (isDirection) {
+                    const res = await reportService.getAll(params);
+                    reportsData = res.data?.data?.reports || res.data?.reports || [];
+                } else {
+                    const [myRes, publicRes] = await Promise.all([
+                        reportService.getMy(params),
+                        reportService.getAll({ ...params, status: filter, visibility: "public" }),
+                    ]);
+
+                    const myReports = myRes.data?.data?.reports || myRes.data?.reports || [];
+                    const publicReports = publicRes.data?.data?.reports || publicRes.data?.reports || [];
+
+                    const combined = [...myReports];
+                    publicReports.forEach((pr) => {
+                        if (!combined.find((r) => r.id === pr.id)) {
+                            combined.push(pr);
+                        }
+                    });
+
+                    reportsData = combined;
+                }
+            }
+
+            setReports(reportsData);
+        } catch (e) {
+            console.error("Erreur chargement rapports:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
     useEffect(() => {
-        loadDepartmentStats();
+        if (isDirection) {
+            loadDepartmentStats();
+        }
         loadReports();
     }, [filter, isDirection]);
 
