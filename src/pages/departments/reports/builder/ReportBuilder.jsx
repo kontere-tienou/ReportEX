@@ -249,7 +249,7 @@ export default function ReportBuilder() {
         } catch { addToast('Erreur de sauvegarde', 'error', 3000); }
     };
 
-    const handleGenerateReport = async () => {
+    /*const handleGenerateReport = async () => {
         if (!reportConfig.title) { addToast('Titre obligatoire', 'warning', 3000); return; }
         if (!reportConfig.periodStart) { addToast('Date de début obligatoire', 'warning', 3000); return; }
         if (!reportConfig.periodEnd) { addToast('Date de fin obligatoire', 'warning', 3000); return; }
@@ -295,8 +295,88 @@ export default function ReportBuilder() {
         } finally {
             setLoading(false);
         }
-    };
+    };*/
+    const handleGenerateReport = async () => {
 
+        if (!reportConfig.title) {
+            addToast('Titre obligatoire', 'warning', 3000);
+            return;
+        }
+
+        if (!reportConfig.periodStart) {
+            addToast('Date de début obligatoire', 'warning', 3000);
+            return;
+        }
+
+        if (!reportConfig.periodEnd) {
+            addToast('Date de fin obligatoire', 'warning', 3000);
+            return;
+        }
+
+        if (!layout.length) {
+            addToast('Ajoutez au moins un composant', 'warning', 3000);
+            return;
+        }
+
+        const { id: departmentId } = department;
+
+        if (!departmentId) {
+            addToast('Département introuvable', 'error', 3000);
+            return;
+        }
+
+        const payload = {
+            title: reportConfig.title,
+
+            period_start: reportConfig.periodStart,
+            period_end: reportConfig.periodEnd,
+
+            visibility: reportConfig.visibility,
+
+            layout: layout.map(c => ({
+                ...c,
+                icon: c.icon?.name || "FileText"
+            })),
+
+            dateRange: {
+                start: reportConfig.periodStart,
+                end: reportConfig.periodEnd,
+                period: reportConfig.period
+            }
+        };
+
+        try {
+
+            setLoading(true);
+
+            addToast('Génération en cours…', 'info', 2000);
+
+            await reportService.create(payload);
+
+            addToast('Rapport créé !', 'success', 3000);
+
+            setReportConfig({
+                title: '',
+                period: 'month',
+                periodStart: '',
+                periodEnd: '',
+                visibility: 'private'
+            });
+
+        } catch (err) {
+
+            const msg =
+                err.response?.data?.message ||
+                err.message ||
+                'Erreur serveur';
+
+            addToast(msg, 'error', 5000);
+            console.log(payload);
+
+        } finally {
+            setLoading(false);
+        }
+    };
     const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 
     if (!user) {
