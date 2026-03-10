@@ -1,5 +1,5 @@
 // reportBuilderApi.js
-import api from '../../../../services/api.js';
+import api from './api.js';
 
 export const reportBuilderApi = {
     saveLayout: (reportId, data) =>

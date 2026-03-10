@@ -3,7 +3,6 @@ import {
     TextBlock,
     TableBlock,
     ChartBlock,
-    KPIBlock,
 } from './components';
 import useComponentProcessor from './hooks/useComponentProcessor';
 import { useMemo } from 'react';
@@ -13,7 +12,7 @@ const componentMap = {
     chart: ChartBlock,
     table: TableBlock,
     text: TextBlock,
-    kpi: KPIBlock,
+    //kpi: KPIBlock,
     //pie: PieBlock
 };
 

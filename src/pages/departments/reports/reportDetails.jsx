@@ -6,8 +6,8 @@ import {
     MessageSquare, Lock, Send, AlertCircle, FileText,
     Calendar, User, Building2, Clock, Edit, Trash2, Globe, Eye,
 } from 'lucide-react';
-import { reportAccessService, reportService } from './services/reportApi.js';
-import { ToastContainer, useToast } from '../../../components/ui/index.js';
+import { reportAccessService, reportService } from '../../../services/reportApi.js';
+import {Alert, Popover, ToastContainer, useToast} from '../../../components/ui/index.js';
 import { branding } from '../../../config/brandingConstant.js';
 import CustomReportRenderer from "./builder/customReportRender.jsx";
 
@@ -316,18 +316,37 @@ export default function ReportDetails() {
     const handleDownloadPdf = async () => {
         try {
             const res = await reportService.exportPdf(id);
-            const url = window.URL.createObjectURL(new Blob([res.data]));
-            const a = document.createElement('a');
-            a.href = url; a.setAttribute('download', `rapport_${id}.pdf`);
-            document.body.appendChild(a); a.click(); a.remove();
+
+            const blob = new Blob([res.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.setAttribute("download", `rapport_${id}.pdf`);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            addToast(err.response?.data?.message || 'Erreur de téléchargement', 'error', 2500);
+            let message = "Erreur de téléchargement";
+
+            try {
+                if (err.response?.data instanceof Blob) {
+                    const text = await err.response.data.text();
+                    const parsed = JSON.parse(text);
+                    message = parsed?.message || message;
+                } else {
+                    message = err.response?.data?.message || err.message || message;
+                }
+            } catch {
+                message = err.response?.data?.message || err.message || message;
+            }
+
+            addToast(message, "error", 2500);
         }
     };
-
     const handleDelete = async () => {
-        if (!window.confirm('Supprimer définitivement ce rapport ?')) return;
         try {
             await reportService.delete(id);
             addToast('Rapport supprimé', 'success', 1500);
@@ -396,7 +415,33 @@ export default function ReportDetails() {
                             <Btn variant="ghost" icon={Download} onClick={handleDownloadPdf} title="Télécharger PDF" />
                             <Btn variant="ghost" icon={Printer} onClick={() => window.print()} title="Imprimer" />
                             {permissions?.canEdit && <Btn variant="ghost" icon={Edit} title="Modifier" />}
-                            {permissions?.canDelete && <Btn variant="danger" icon={Trash2} onClick={handleDelete} title="Supprimer" />}
+                            {permissions?.canDelete && (
+                                <Popover
+                                    position="bottom-right"
+                                    on="click"
+                                    trigger={
+                                        <div>
+                                            <Btn variant="danger" icon={Trash2} title="Supprimer" />
+                                        </div>
+                                    }
+                                    content={
+                                        <div className="w-72 space-y-3">
+                                            <Alert variant="warning" title="Confirmation">
+                                                Cette action supprimera définitivement ce rapport.
+                                            </Alert>
+
+                                            <div className="flex justify-end gap-2">
+                                                <Btn variant="outline">
+                                                    Annuler
+                                                </Btn>
+                                                <Btn variant="reject" icon={Trash2} onClick={handleDelete}>
+                                                    Supprimer
+                                                </Btn>
+                                            </div>
+                                        </div>
+                                    }
+                                />
+                            )}
                         </div>
                     </div>
 

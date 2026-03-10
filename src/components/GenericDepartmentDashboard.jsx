@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from "../context/AuthContext.jsx";
-import { reportService } from "../pages/departments/reports/services/reportApi.js";
+import { reportService } from "../services/reportApi.js";
 
 // Composant générique de dashboard qui s'adapte à chaque département
 const GenericDepartmentDashboard = ({

@@ -1,5 +1,5 @@
-import api from '../../../../services/api.js';
-import { getFallbackSchema, getAllFallbackDepartments } from '../departmentSchema.jsx';
+import api from './api.js';
+import { getFallbackSchema, getAllFallbackDepartments } from '../pages/departments/dataEntry/departmentSchema.jsx';
 
 export const schemaService = {
     /**

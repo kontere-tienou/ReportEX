@@ -1,5 +1,5 @@
 // dataService.js
-import api from '../../../../services/api.js';
+import api from './api.js';
 
 export const dataService = {
     async getAll(deptCode, params = {}) {

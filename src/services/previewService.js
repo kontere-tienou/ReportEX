@@ -1,5 +1,5 @@
 // frontend/src/services/previewDataService.js
-import api from '../../../../services/api.js';
+import api from './api.js';
 
 class PreviewDataService {
     constructor() {

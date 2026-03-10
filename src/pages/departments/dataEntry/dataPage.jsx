@@ -13,8 +13,8 @@ import {
     AlertCircle,
     RefreshCw,
 } from 'lucide-react';
-import { schemaService } from './service/schemaService.js';
-import { dataService } from './service/dataService';
+import { schemaService } from '../../../services/schemaService.js';
+import { dataService } from '../../../services/dataService.js';
 import { useToast, ToastContainer } from '../../../components/ui/Toast';
 import DataEntryModal from './DataEntryModal';
 import Table from '../../../components/ui/Table';

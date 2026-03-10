@@ -15,7 +15,7 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
-import { previewDataService } from '../services/previewService.js';
+import { previewDataService } from '../../../../services/previewService.js';
 import {formatCellValue, formatDateValue} from './utils/tableFormaterUtils.js';
 //import {KPIBlock} from "./components/index.js";
 

@@ -2,7 +2,7 @@
    REPORT SERVICE
 ========================================================== */
 
-import api from "../../../../services/api.js";
+import api from "./api.js";
 
 export const reportService = {
 
@@ -66,9 +66,7 @@ export const reportService = {
             responseType: 'blob',
         }),
 
-    /* ======================================================
-       CUSTOM DRAG & DROP REPORTS
-    ====================================================== */
+
 
     generateCustom: (data) =>
         api.post('/reports/custom/generate', data),

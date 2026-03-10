@@ -20,7 +20,7 @@ import {
     Lock,
     Wand2,
 } from "lucide-react";
-import { reportService } from "./services/reportApi.js";
+import { reportService } from "../../../services/reportApi.js";
 
 const statusBadgeMap = {
     brouillon: { bg: "bg-gray-100", text: "text-gray-700", icon: Clock },

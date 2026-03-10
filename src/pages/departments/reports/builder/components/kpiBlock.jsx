@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
-import { previewDataService } from "../../services/previewService.js";
+import { previewDataService } from "../../../../../services/previewService.js";
 import { formatCellValue } from "../utils/tableFormaterUtils.js";
 
 export default function KPIBlock({ department, dateRange }) {

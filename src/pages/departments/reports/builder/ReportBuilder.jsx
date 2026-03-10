@@ -25,7 +25,7 @@ import useDragManager from './hooks/useDragManager';
 import useSelectedBlock from './hooks/useSelectedBlock';
 import { useToast, ToastContainer } from '../../../../components/ui/Toast';
 import BlockSettingsPanel from './BlockSettingsPanel';
-import { reportService } from "../services/reportApi.js";
+import { reportService } from "../../../../services/reportApi.js";
 import { getDepartmentByCode, DEPARTMENTS } from '../../../../config/departments';
 
 /* ─── Visibility pill options ─── */

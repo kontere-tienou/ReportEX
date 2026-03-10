@@ -1,6 +1,6 @@
 // hooks/useBuilderToolbar.js
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { schemaService } from '../../../dataEntry/service/schemaService';
+import { schemaService } from '../../../../../services/schemaService.js';
 
 // Component generator function for all departments
 const generateComponents = (deptCode, schema) => {

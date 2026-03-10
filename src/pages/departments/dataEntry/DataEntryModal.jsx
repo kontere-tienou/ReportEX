@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Database, Calendar, Hash, Type, AlignLeft } from 'lucide-react';
-import { dataService } from './service/dataService';
+import { dataService } from '../../../services/dataService.js';
 import { useToast } from '../../../components/ui/Toast';
 
 export default function DataEntryModal({

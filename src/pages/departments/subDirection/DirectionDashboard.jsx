@@ -4,7 +4,7 @@ import {
     BarChart3, TrendingUp, Users, Building2, CheckCircle, AlertCircle, Clock
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import {reportService} from "../reports/services/reportApi.js";
+import {reportService} from "../../../services/reportApi.js";
 
 const DirectionDashboard = () => {
     const { user } = useAuth();

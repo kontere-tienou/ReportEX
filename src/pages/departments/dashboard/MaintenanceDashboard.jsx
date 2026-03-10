@@ -5,7 +5,7 @@ import {
     Settings, Activity
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import {reportService} from "../reports/services/reportApi.js";
+import {reportService} from "../../../services/reportApi.js";
 
 const MaintenanceDashboard = () => {
     const { user } = useAuth();
