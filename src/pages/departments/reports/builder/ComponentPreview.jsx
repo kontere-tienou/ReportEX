@@ -17,7 +17,7 @@ import {
 import { TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
 import { previewDataService } from '../services/previewService.js';
 import {formatCellValue, formatDateValue} from './utils/tableFormaterUtils.js';
-import {KPIBlock} from "./components/index.js";
+//import {KPIBlock} from "./components/index.js";
 
 const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
