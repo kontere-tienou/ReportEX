@@ -11,8 +11,9 @@ export const reportService = {
     create: (data) =>
         api.post('/reports', data),
 
-    update: (id, payload) =>
-        api.put(`/reports/${id}`, payload),
+    /*update: (id, payload) =>
+        api.put(`/reports/${id}`, payload),*/
+    update: (id, payload) => api.patch(`/reports/${id}`, payload),
 
     delete: (id) =>
         api.delete(`/reports/${id}`),

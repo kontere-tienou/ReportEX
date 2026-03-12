@@ -233,7 +233,7 @@ export default function ReportBuilder() {
 
     // Get department color
     const department = {
-        id: user?.department_id,
+        id: user?.department?.id,
         name: user?.department?.name || deptName || 'Département',
         code: user?.department?.code || deptName?.toUpperCase() || 'DEPT'
     };

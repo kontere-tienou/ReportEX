@@ -12,48 +12,45 @@ const componentMap = {
     chart: ChartBlock,
     table: TableBlock,
     text: TextBlock,
-    //kpi: KPIBlock,
-    //pie: PieBlock
 };
 
-const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
+const CustomReportRenderer = ({ layout = [], data = {}, mode = 'processed' }) => {
     const { processMetric, processChartData, processTableData } = useComponentProcessor();
 
     const processedComponents = useMemo(() => {
-        if (!layout || layout.length === 0) return [];
+        if (!Array.isArray(layout) || layout.length === 0) return [];
 
-        if (mode === 'snapshot') {
-            return layout;
-        }
-
-        if (!data) {
-            return layout.map(component => ({
-                ...component,
-                processedData: null,
-            }));
-        }
-
-        return layout.map(component => {
+        return layout.map((component) => {
             let processedData = null;
 
-            switch (component.type) {
-                case 'metric':
-                    processedData = processMetric(data, component.config);
-                    break;
-                case 'chart':
-                    processedData = processChartData(data, component.config);
-                    break;
-                case 'table':
-                    processedData = processTableData(data, component.config);
-                    break;
-                case 'text':
-                    processedData = component.config?.content || '';
-                    break;
-                case 'text-aerea':
-                    processedData = component.config?.content || '';
-                    break;
-                default:
-                    processedData = null;
+            if (mode === 'snapshot') {
+                processedData =
+                    component.processedData ??
+                    component.data ??
+                    component.value ??
+                    null;
+            } else {
+                switch (component.type) {
+                    case 'metric':
+                        processedData = processMetric(data, component.config);
+                        break;
+
+                    case 'chart':
+                        processedData = processChartData(data, component.config);
+                        break;
+
+                    case 'table':
+                        processedData = processTableData(data, component.config);
+                        break;
+
+                    case 'text':
+                    case 'text-aerea':
+                        processedData = component.config?.content || '';
+                        break;
+
+                    default:
+                        processedData = null;
+                }
             }
 
             return {
@@ -63,7 +60,7 @@ const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
         });
     }, [layout, data, mode, processMetric, processChartData, processTableData]);
 
-    if (!layout || layout.length === 0) {
+    if (!Array.isArray(layout) || layout.length === 0) {
         return (
             <div className="text-center py-12 text-gray-500">
                 Aucun composant dans ce rapport personnalisé.
@@ -93,6 +90,7 @@ const CustomReportRenderer = ({ layout = [], data, mode = 'processed' }) => {
                                 {component.config.title}
                             </h3>
                         )}
+
                         <Component
                             component={component}
                             value={component.processedData}

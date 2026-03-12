@@ -247,30 +247,42 @@ export default function ReportDetails() {
             if (mounted) setLoading(false);
         }
     };
+    /*++++++*/
+    const reportPayload = (() => {
+        const raw = report?.data ?? report?.layout ?? {};
 
-    const reportPayload =
-        typeof report?.data === 'string'
-            ? (() => {
-                try {
-                    return JSON.parse(report.data);
-                } catch {
-                    return {};
-                }
-            })()
-            : (report?.data || {});
+        if (typeof raw === 'string') {
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return {};
+            }
+        }
 
-    const customLayout =
-        reportPayload?.renderedLayout ||
-        reportPayload?.layout ||
-        [];
+        return raw && typeof raw === 'object' ? raw : {};
+    })();
 
-    const hasCustomLayout =
-        Array.isArray(customLayout) && customLayout.length > 0;
+    const builderLayout = Array.isArray(reportPayload?.renderedLayout)
+        ? reportPayload.renderedLayout
+        : Array.isArray(reportPayload?.layout)
+            ? reportPayload.layout
+            : [];
 
-// Snapshot si on a déjà les données calculées
-    const isSnapshotLayout =
-        Array.isArray(reportPayload?.renderedLayout) &&
-        reportPayload.renderedLayout.length > 0;
+    const builderSourceData =
+        reportPayload?.sourceData && typeof reportPayload.sourceData === 'object'
+            ? reportPayload.sourceData
+            : {};
+
+    const builderDateRange = reportPayload?.dateRange || {
+        start: report?.period_start || null,
+        end: report?.period_end || null,
+        period: 'month',
+    };
+
+    const hasCustomLayout = builderLayout.length > 0;
+
+
+    /*+++++++*/
 
 
     const handleAddComment = async () => {
@@ -346,6 +358,20 @@ export default function ReportDetails() {
             addToast(message, "error", 2500);
         }
     };
+
+    const handleSubmitReport = async () => {
+        try {
+            await reportService.submit(id);
+            await loadReport();
+            addToast('Rapport soumis avec succès', 'success', 2000);
+        } catch (err) {
+            addToast(
+                err.response?.data?.message || 'Erreur de soumission',
+                'error',
+                2500
+            );
+        }
+    };
     const handleDelete = async () => {
         try {
             await reportService.delete(id);
@@ -383,6 +409,7 @@ export default function ReportDetails() {
 
     const isValidation = validationData.status === 'valide';
 
+
     return (
         <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans','Inter',system-ui,sans-serif" }}>
             <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -412,9 +439,28 @@ export default function ReportDetails() {
 
                         {/* Right actions */}
                         <div className="flex items-center gap-1 flex-shrink-0">
+                            {permissions?.canSubmit && report.status === 'brouillon' && (
+                                <Btn
+                                    variant="primary"
+                                    icon={Send}
+                                    title="Soumettre"
+                                    onClick={handleSubmitReport}
+                                >
+                                    Soumettre
+                                </Btn>
+                            )}
                             <Btn variant="ghost" icon={Download} onClick={handleDownloadPdf} title="Télécharger PDF" />
                             <Btn variant="ghost" icon={Printer} onClick={() => window.print()} title="Imprimer" />
-                            {permissions?.canEdit && <Btn variant="ghost" icon={Edit} title="Modifier" />}
+                            {permissions?.canEdit && (
+                                <Btn
+                                    variant="ghost"
+                                    icon={Edit}
+                                    title="Modifier"
+                                    onClick={() => navigate(`/reports/builder/${report.id}`)}
+                                >
+                                    Modifier
+                                </Btn>
+                            )}
                             {permissions?.canDelete && (
                                 <Popover
                                     position="bottom-right"
@@ -527,9 +573,10 @@ export default function ReportDetails() {
 
                                 {hasCustomLayout ? (
                                     <CustomReportRenderer
-                                        layout={customLayout}
-                                        mode={isSnapshotLayout ? 'snapshot' : 'processed'}
-                                        data={reportPayload?.sourceData || reportPayload}
+                                        layout={builderLayout}
+                                        mode="processed"
+                                        data={builderSourceData}
+                                        dateRange={builderDateRange}
                                     />
                                 ) : typeof report.data === 'object' && report.data !== null ? (
                                     <div className="divide-y divide-slate-50">
