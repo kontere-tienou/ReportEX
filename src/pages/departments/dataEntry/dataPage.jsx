@@ -399,7 +399,8 @@ export default function Data() {
                             </div>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">
-                            {formatNumberValue(stats.thisMonth || 0)}
+                            {/*{formatNumberValue(stats.thisMonth || 0)}*/}
+                            value={formatNumberValue(stats.today)}
                         </p>
                         <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                             <ArrowUpRight className="w-3 h-3" />
@@ -417,7 +418,7 @@ export default function Data() {
                             </div>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">
-                            {formatNumberValue(stats.thisWeek || 0)}
+                            value={formatNumberValue(stats.today)}
                         </p>
                         <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
                             <Activity className="w-3 h-3" />
@@ -435,7 +436,7 @@ export default function Data() {
                             </div>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">
-                            {formatNumberValue(stats.today || 0)}
+                            value={formatNumberValue(stats.today)}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                             {stats.today > 0 ? "Actif" : "Aucune saisie"}
