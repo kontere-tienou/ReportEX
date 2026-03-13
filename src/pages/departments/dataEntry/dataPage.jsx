@@ -1,4 +1,4 @@
-// Data.jsx - With integrated table formatters
+// Data.jsx - Modern UI Design with integrated table formatters
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -12,6 +12,10 @@ import {
     TrendingUp,
     AlertCircle,
     RefreshCw,
+    Filter,
+    ArrowUpRight,
+    FileText,
+    Activity,
 } from 'lucide-react';
 import { schemaService } from '../../../services/schemaService.js';
 import { dataService } from '../../../services/dataService.js';
@@ -27,24 +31,6 @@ import {
     formatNumberValue,
     isDateValue
 } from "../reports/builder/utils/tableFormaterUtils.js";
-
-    // Money columns
-    const moneyColumns = [
-        'ca',
-        'ca_journalier',
-        'ca_cumule',
-        'caisse_entrees',
-        'caisse_sorties',
-        'solde_caisse',
-        'montant',
-        'montant_achats_jour',
-        'total',
-        'prix',
-        'cout',
-        'budget',
-        'economies_realisees'
-    ];
-
 
 export default function Data() {
     const { user } = useAuth();
@@ -191,18 +177,31 @@ export default function Data() {
     // Show error state
     if (error) {
         return (
-            <div className="max-w-7xl mx-auto space-y-6 p-6">
-                <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
-                    <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-red-700 mb-2">
-                        Erreur de chargement
-                    </h3>
-                    <p className="text-red-600 mb-4">
-                        {error}
-                    </p>
-                    <div className="bg-red-100 p-4 rounded-lg mb-6 max-w-lg mx-auto">
-                        <p className="text-sm text-red-800 mb-2">Informations de débogage:</p>
-                        <pre className="text-xs text-left text-red-900 overflow-auto">
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+                <div className="bg-white border border-red-100 rounded-2xl shadow-sm p-8 max-w-2xl w-full">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-red-50 rounded-xl">
+                            <AlertCircle className="w-8 h-8 text-red-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                                Erreur de chargement
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                Impossible de charger les données
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6">
+                        <p className="text-sm text-red-800">{error}</p>
+                    </div>
+
+                    <details className="mb-6">
+                        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                            Informations de débogage
+                        </summary>
+                        <pre className="text-xs text-gray-600 mt-2 p-3 bg-gray-50 rounded-lg overflow-auto">
                             {JSON.stringify({
                                 deptCode,
                                 deptName,
@@ -211,18 +210,19 @@ export default function Data() {
                                 timestamp: new Date().toISOString()
                             }, null, 2)}
                         </pre>
-                    </div>
-                    <div className="flex items-center justify-center space-x-4">
+                    </details>
+
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={handleRetry}
-                            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium transition-colors"
                         >
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Réessayer
                         </button>
                         <button
                             onClick={handleGoBack}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
                         >
                             Retour
                         </button>
@@ -235,11 +235,15 @@ export default function Data() {
     // Show loading while schema is loading
     if (schemaLoading) {
         return (
-            <div className="flex items-center justify-center h-screen">
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-cyan-100 border-t-cyan-600 animate-spin" />
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto"></div>
-                    <p className="text-sm text-gray-500 mt-4">Chargement du formulaire...</p>
-                    <p className="text-xs text-gray-400 mt-2">Département: {deptCode || 'Non défini'}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                        Chargement du formulaire...
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                        Département: {deptCode || 'Non défini'}
+                    </p>
                 </div>
             </div>
         );
@@ -247,18 +251,28 @@ export default function Data() {
 
     if (!schema) {
         return (
-            <div className="text-center py-12">
-                <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900">Erreur de chargement</h3>
-                <p className="text-gray-600">Impossible de charger le formulaire pour {departmentDisplayName}</p>
-                <p className="text-sm text-gray-500 mt-2">Code département: {deptCode}</p>
-                <button
-                    onClick={handleRetry}
-                    className="mt-4 inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
-                >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Réessayer
-                </button>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+                <div className="text-center max-w-md">
+                    <div className="p-4 bg-red-50 rounded-2xl inline-block mb-4">
+                        <AlertCircle className="w-16 h-16 text-red-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                        Schéma introuvable
+                    </h3>
+                    <p className="text-gray-600 mb-1">
+                        Impossible de charger le formulaire pour {departmentDisplayName}
+                    </p>
+                    <p className="text-sm text-gray-400 mb-6">
+                        Code département: {deptCode}
+                    </p>
+                    <button
+                        onClick={handleRetry}
+                        className="inline-flex items-center px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium transition-colors shadow-sm"
+                    >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Réessayer
+                    </button>
+                </div>
             </div>
         );
     }
@@ -274,7 +288,7 @@ export default function Data() {
         return matchSearch && matchDate;
     });
 
-    // ✅ Préparer colonnes table avec formatters intégrés
+    // Préparer colonnes table avec formatters
     const columns = [
         {
             key: 'date',
@@ -283,7 +297,7 @@ export default function Data() {
             render: (value) => (
                 <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900">
                         {formatDateValue(value)}
                     </span>
                 </div>
@@ -297,7 +311,7 @@ export default function Data() {
                 header: field.label,
                 sortable: true,
                 render: (value) => (
-                    <span className="text-gray-900">
+                    <span className="text-gray-900 font-medium">
                         {formatCellValue(value, field.key, field.type)}
                     </span>
                 ),
@@ -307,17 +321,17 @@ export default function Data() {
             header: 'Actions',
             sortable: false,
             render: (_, row) => (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => handleEdit(row)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Modifier"
                     >
                         <Edit className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => handleDelete(row.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Supprimer"
                     >
                         <Trash2 className="w-4 h-4" />
@@ -328,97 +342,118 @@ export default function Data() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="min-h-screen bg-gray-50 p-6 md:p-8">
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-            {/* Header with department icon and title */}
-            <div className={`bg-gradient-to-r ${schema.color || 'from-cyan-600 to-blue-600'} rounded-xl p-6 text-white`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                        <div className="text-4xl">{schema.icon}</div>
-                        <div>
-                            <h1 className="text-3xl font-bold">
-                                {schema.title || `Données ${departmentDisplayName}`}
-                            </h1>
-                            <p className="text-cyan-100 mt-1">
-                                {schema.description || `Gérez vos saisies pour ${departmentDisplayName}`}
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleCreate}
-                        className="inline-flex items-center px-6 py-3 bg-white text-cyan-600 rounded-lg hover:bg-cyan-50 font-medium transition-colors shadow-lg"
-                    >
-                        <Plus className="w-5 h-5 mr-2" />
-                        Nouvelle Saisie
-                    </button>
+            {/* Header */}
+            <div className="flex items-end justify-between mb-8 pb-6 border-b border-gray-200">
+                <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">
+                        {schema.icon} Saisie de Données
+                    </p>
+                    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+                        {schema.title || departmentDisplayName}
+                    </h1>
+                    <p className="text-sm text-gray-400 mt-2">
+                        {schema.description || `Gérez vos saisies quotidiennes · ${departmentDisplayName}`}
+                    </p>
                 </div>
+
+                <button
+                    onClick={handleCreate}
+                    className="inline-flex items-center px-6 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 font-medium transition-all shadow-lg hover:shadow-xl"
+                >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Nouvelle Saisie
+                </button>
             </div>
 
             {/* Stats Cards */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white rounded-xl border p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600">Total Saisies</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {formatNumberValue(stats.total || 0)}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-blue-100 rounded-lg">
-                                <Calendar className="w-6 h-6 text-blue-600" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                                Total Saisies
+                            </span>
+                            <div className="p-2 bg-blue-50 rounded-xl">
+                                <FileText className="w-5 h-5 text-blue-600" />
                             </div>
                         </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                            {formatNumberValue(stats.total || 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <ArrowUpRight className="w-3 h-3" />
+                            Toutes périodes
+                        </p>
                     </div>
 
-                    <div className="bg-white rounded-xl border p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600">Ce Mois</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {formatNumberValue(stats.thisMonth || 0)}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <TrendingUp className="w-6 h-6 text-green-600" />
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-green-500 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                                Ce Mois
+                            </span>
+                            <div className="p-2 bg-green-50 rounded-xl">
+                                <TrendingUp className="w-5 h-5 text-green-600" />
                             </div>
                         </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                            {formatNumberValue(stats.thisMonth || 0)}
+                        </p>
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <ArrowUpRight className="w-3 h-3" />
+                            {Math.round((stats.thisMonth / stats.total) * 100) || 0}% du total
+                        </p>
                     </div>
 
-                    <div className="bg-white rounded-xl border p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600">Cette Semaine</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {formatNumberValue(stats.thisWeek || 0)}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-purple-100 rounded-lg">
-                                <Calendar className="w-6 h-6 text-purple-600" />
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-purple-500 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                                Cette Semaine
+                            </span>
+                            <div className="p-2 bg-purple-50 rounded-xl">
+                                <Calendar className="w-5 h-5 text-purple-600" />
                             </div>
                         </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                            {formatNumberValue(stats.thisWeek || 0)}
+                        </p>
+                        <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                            <Activity className="w-3 h-3" />
+                            7 derniers jours
+                        </p>
                     </div>
 
-                    <div className="bg-white rounded-xl border p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600">Aujourd'hui</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">
-                                    {formatNumberValue(stats.today || 0)}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-amber-100 rounded-lg">
-                                <AlertCircle className="w-6 h-6 text-amber-600" />
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-amber-500 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                                Aujourd'hui
+                            </span>
+                            <div className="p-2 bg-amber-50 rounded-xl">
+                                <AlertCircle className="w-5 h-5 text-amber-600" />
                             </div>
                         </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                            {formatNumberValue(stats.today || 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {stats.today > 0 ? "Actif" : "Aucune saisie"}
+                        </p>
                     </div>
                 </div>
             )}
 
             {/* Filters */}
-            <div className="bg-white rounded-xl border p-4">
-                <div className="flex flex-wrap items-center gap-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <Filter className="w-4 h-4 text-gray-400" />
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                        Filtres
+                    </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
                     <div className="flex-1 min-w-[300px]">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -426,8 +461,8 @@ export default function Data() {
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Rechercher..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                                placeholder="Rechercher dans les données..."
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                             />
                         </div>
                     </div>
@@ -437,13 +472,13 @@ export default function Data() {
                             type="date"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                         />
                     </div>
 
                     <button
                         onClick={handleExport}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                        className="inline-flex items-center px-5 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium transition-all"
                     >
                         <Download className="w-4 h-4 mr-2" />
                         Exporter
@@ -455,7 +490,7 @@ export default function Data() {
                                 setSearchTerm('');
                                 setDateFilter('');
                             }}
-                            className="text-sm text-gray-600 hover:text-gray-900"
+                            className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
                         >
                             Réinitialiser
                         </button>
@@ -464,27 +499,35 @@ export default function Data() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <div className="w-12 h-12 rounded-full border-4 border-cyan-100 border-t-cyan-600 animate-spin mb-4" />
+                        <p className="text-sm text-gray-500">Chargement des données...</p>
                     </div>
                 ) : filteredData.length === 0 ? (
-                    <div className="text-center py-12">
-                        <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-400 mb-2">
+                    <div className="text-center py-16">
+                        <div className="p-4 bg-gray-50 rounded-2xl inline-block mb-4">
+                            <Calendar className="w-16 h-16 text-gray-300" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
                             Aucune donnée
                         </h3>
                         <p className="text-sm text-gray-500 mb-6">
-                            Commencez par créer votre première saisie pour {departmentDisplayName}
+                            {searchTerm || dateFilter
+                                ? "Aucun résultat ne correspond à vos critères"
+                                : `Commencez par créer votre première saisie pour ${departmentDisplayName}`
+                            }
                         </p>
-                        <button
-                            onClick={handleCreate}
-                            className="inline-flex items-center px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium transition-colors"
-                        >
-                            <Plus className="w-5 h-5 mr-2" />
-                            Nouvelle Saisie
-                        </button>
+                        {!searchTerm && !dateFilter && (
+                            <button
+                                onClick={handleCreate}
+                                className="inline-flex items-center px-6 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 font-medium transition-all shadow-lg"
+                            >
+                                <Plus className="w-5 h-5 mr-2" />
+                                Nouvelle Saisie
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <Table
@@ -497,15 +540,15 @@ export default function Data() {
                 )}
             </div>
 
-            {/* Info */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            {/* Info Banner */}
+            <div className="mt-6 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-100 rounded-2xl p-4">
                 <p className="text-sm text-blue-800">
                     💡 <strong>Astuce:</strong> Saisissez vos données quotidiennes pour {departmentDisplayName}.
-                    Les montants sont formatés automatiquement en FCFA.
+                    Les montants sont automatiquement formatés en FCFA et les statistiques se mettent à jour en temps réel.
                 </p>
             </div>
 
-            {/* Modal with dynamic fields based on department */}
+            {/* Modal */}
             {showModal && schema && (
                 <DataEntryModal
                     isOpen={showModal}
