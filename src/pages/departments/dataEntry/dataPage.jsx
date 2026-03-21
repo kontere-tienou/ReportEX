@@ -3,8 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Plus, Calendar, Search, Download, Edit, Trash2,
-    TrendingUp, AlertCircle, RefreshCw, Filter,
-    ArrowUpRight, FileText, Activity, Clock,
+    AlertCircle, RefreshCw, ChevronDown, X,
 } from 'lucide-react';
 import { schemaService } from '../../../services/schemaService.js';
 import { dataService } from '../../../services/dataService.js';
@@ -15,213 +14,183 @@ import { getDepartmentDisplayName } from '../reports/builder/utils/departmentMap
 import { resolveDepartmentCode, validateDepartmentCode } from '../reports/builder/utils/departmentUtils.js';
 import {
     formatCellValue, formatDateValue, formatMoneyFCFA,
-    formatNumberValue, isDateValue
+    formatNumberValue,
 } from "../reports/builder/utils/tableFormaterUtils.js";
 
 export default function Data() {
-    const { user } = useAuth();
+    const { user }    = useAuth();
     const { deptName } = useParams();
-    const navigate = useNavigate();
+    const navigate    = useNavigate();
     const { toasts, addToast, removeToast } = useToast();
 
-    const [dataList, setDataList] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [schemaLoading, setSchemaLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingData, setEditingData] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
-    const [schema, setSchema] = useState(null);
-    const [error, setError] = useState(null);
+    const [dataList,     setDataList]     = useState([]);
+    const [loading,      setLoading]      = useState(true);
+    const [schemaLoading,setSchemaLoading]= useState(true);
+    const [showModal,    setShowModal]    = useState(false);
+    const [editingData,  setEditingData]  = useState(null);
+    const [schema,       setSchema]       = useState(null);
+    const [error,        setError]        = useState(null);
 
-    const deptCode = resolveDepartmentCode(deptName, user);
+    // Filtres
+    const [search,    setSearch]    = useState('');
+    const [dateFrom,  setDateFrom]  = useState(''); // YYYY-MM-DD
+    const [dateTo,    setDateTo]    = useState(''); // YYYY-MM-DD ou vide = jour unique
+    const [calOpen,   setCalOpen]   = useState(false);
+    const [hoverDay,  setHoverDay]  = useState(null);
+    const [calYear,   setCalYear]   = useState(new Date().getFullYear());
+    const [calMonth,  setCalMonth]  = useState(new Date().getMonth());
+    const [sortField, setSortField] = useState('date');
+    const [sortDir,   setSortDir]   = useState('desc');
+
+    // Helpers calendrier
+    const toYMD = (d) => d.toISOString().split('T')[0];
+    const fromYMD = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+    const daysInMonth = (y, m) => new Date(y, m+1, 0).getDate();
+    const firstDayOfMonth = (y, m) => new Date(y, m, 1).getDay(); // 0=dim
+
+    const calLabel = () => {
+        if (!dateFrom) return 'Date';
+        if (!dateTo || dateTo === dateFrom) {
+            return fromYMD(dateFrom).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        const f = fromYMD(dateFrom).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        const t = fromYMD(dateTo).toLocaleDateString('fr-FR',   { day: 'numeric', month: 'short', year: 'numeric' });
+        return `${f} → ${t}`;
+    };
+
+    const handleCalDay = (ymd) => {
+        if (!dateFrom || (dateFrom && dateTo)) {
+            // Début d'une nouvelle sélection
+            setDateFrom(ymd); setDateTo('');
+        } else {
+            // Fin de sélection
+            if (ymd < dateFrom) { setDateTo(dateFrom); setDateFrom(ymd); }
+            else                { setDateTo(ymd); }
+            setCalOpen(false); setHoverDay(null);
+        }
+    };
+
+    const isDayInRange = (ymd) => {
+        if (!dateFrom) return false;
+        const end = dateTo || hoverDay;
+        if (!end) return ymd === dateFrom;
+        const [a, b] = dateFrom < end ? [dateFrom, end] : [end, dateFrom];
+        return ymd >= a && ymd <= b;
+    };
+    const isDayStart = (ymd) => ymd === dateFrom;
+    const isDayEnd   = (ymd) => {
+        const end = dateTo || hoverDay;
+        return end && ymd === (dateFrom < end ? end : dateFrom) && ymd !== dateFrom;
+    };
+
+    const prevMonth = () => {
+        if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); }
+        else setCalMonth(m => m-1);
+    };
+    const nextMonth = () => {
+        if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); }
+        else setCalMonth(m => m+1);
+    };
+
+    const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    const DAYS_FR   = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+
+    const deptCode            = resolveDepartmentCode(deptName, user);
     const departmentDisplayName = getDepartmentDisplayName(deptCode) || deptName || 'Département';
 
-    /* ── Stats ─────────────────────────────────────────────────────── */
-    const calculateStats = (data) => {
-        const today = new Date().toISOString().split('T')[0];
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        const diff = now.getDay() === 0 ? 6 : now.getDay() - 1;
-        startOfWeek.setDate(now.getDate() - diff);
-        startOfWeek.setHours(0, 0, 0, 0);
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        let total = 0, todayCount = 0, thisWeekCount = 0, thisMonthCount = 0;
-        data.forEach(item => {
-            total++;
-            const d = new Date(item.date);
-            if (item.date === today) todayCount++;
-            if (d >= startOfWeek) thisWeekCount++;
-            if (d >= startOfMonth) thisMonthCount++;
-        });
-        return { total, today: todayCount, thisWeek: thisWeekCount, thisMonth: thisMonthCount };
-    };
-
-    const calculateAmounts = (data) => {
-        const today = new Date().toISOString().split('T')[0];
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        const diff = now.getDay() === 0 ? 6 : now.getDay() - 1;
-        startOfWeek.setDate(now.getDate() - diff);
-        startOfWeek.setHours(0, 0, 0, 0);
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        let totalAmount = 0, todayAmount = 0, thisWeekAmount = 0, thisMonthAmount = 0;
-        data.forEach(item => {
-            Object.entries(item).forEach(([key, value]) => {
-                if (typeof value === 'number' &&
-                    (key.includes('caisse') || key.includes('montant') || key.includes('total') ||
-                        key.includes('ca') || key.includes('prix') || key.includes('cout'))) {
-                    totalAmount += value;
-                    const d = new Date(item.date);
-                    if (item.date === today) todayAmount += value;
-                    if (d >= startOfWeek) thisWeekAmount += value;
-                    if (d >= startOfMonth) thisMonthAmount += value;
-                }
-            });
-        });
-        return { totalAmount, todayAmount, thisWeekAmount, thisMonthAmount };
-    };
-
-    const stats   = useMemo(() => calculateStats(dataList), [dataList]);
-    const amounts = useMemo(() => calculateAmounts(dataList), [dataList]);
-
-    /* ── Init ──────────────────────────────────────────────────────── */
+    /* ── Init ── */
     useEffect(() => {
         const init = async () => {
             if (!deptCode) { setError('Impossible de déterminer le département'); setSchemaLoading(false); return; }
             const isValid = await validateDepartmentCode(deptCode);
-            if (!isValid) { setError(`Département "${deptCode}" non trouvé`); setSchemaLoading(false); return; }
+            if (!isValid)  { setError(`Département "${deptCode}" non trouvé`);   setSchemaLoading(false); return; }
             await loadSchema();
         };
         init();
     }, [deptCode]);
 
     const loadSchema = async () => {
-        setSchemaLoading(true);
-        setError(null);
+        setSchemaLoading(true); setError(null);
         try {
-            const deptSchema = await schemaService.getDepartmentSchema(deptCode);
-            if (!deptSchema) throw new Error('Schéma non trouvé');
-            setSchema(deptSchema);
+            const s = await schemaService.getDepartmentSchema(deptCode);
+            if (!s) throw new Error('Schéma non trouvé');
+            setSchema(s);
             await loadData();
         } catch (err) {
-            setError(err.message || 'Erreur lors du chargement du schéma');
+            setError(err.message || 'Erreur schéma');
             addToast('Erreur lors du chargement du schéma', 'error', 3000);
-        } finally {
-            setSchemaLoading(false);
-        }
+        } finally { setSchemaLoading(false); }
     };
 
     const loadData = async () => {
         setLoading(true);
         try {
             const data = await dataService.getAll(deptCode);
-            setDataList(data);
-        } catch (err) {
-            addToast('Erreur lors du chargement des données', 'error', 3000);
-        } finally {
-            setLoading(false);
-        }
+            setDataList(Array.isArray(data) ? data : data?.data ?? []);
+        } catch { addToast('Erreur lors du chargement des données', 'error', 3000); }
+        finally  { setLoading(false); }
     };
 
-    /* ── CRUD ──────────────────────────────────────────────────────── */
+    /* ── CRUD ── */
     const handleCreate = () => { setEditingData(null); setShowModal(true); };
-    const handleEdit   = (data) => { setEditingData(data); setShowModal(true); };
+    const handleEdit   = (row) => { setEditingData(row); setShowModal(true); };
 
     const handleDelete = async (id) => {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer cette saisie ?')) return;
+        if (!confirm('Supprimer cette saisie ?')) return;
         try {
             await dataService.delete(deptCode, id);
-            addToast('Saisie supprimée avec succès', 'success', 2000);
+            addToast('Saisie supprimée', 'success', 2000);
             loadData();
-        } catch {
-            addToast('Erreur lors de la suppression', 'error', 3000);
-        }
+        } catch { addToast('Erreur suppression', 'error', 3000); }
     };
 
-    // Après une sauvegarde réussie : recharge ET le dashboard se mettra à jour
-    // automatiquement grâce à la Page Visibility API dès que l'utilisateur y reviendra
-    const handleSaveSuccess = () => {
-        setShowModal(false);
-        loadData();
-    };
+    const handleSaveSuccess = () => { setShowModal(false); loadData(); };
 
     const handleExport = async () => {
         try {
-            const blob = await dataService.exportData(deptCode, { dateFrom: dateFilter || undefined });
-            const url  = window.URL.createObjectURL(blob);
-            const a    = document.createElement('a');
+            const blob = await dataService.exportData(deptCode, {
+                dateFrom: dateFrom || undefined,
+                dateTo:   dateTo   || undefined,
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a   = document.createElement('a');
             a.href = url;
-            a.setAttribute('download', `donnees_${deptCode}_${Date.now()}.csv`);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            a.setAttribute('download', `${deptCode}_${Date.now()}.csv`);
+            document.body.appendChild(a); a.click(); a.remove();
             addToast('Export réussi', 'success', 2000);
-        } catch {
-            addToast("Erreur lors de l'export", 'error', 3000);
-        }
+        } catch { addToast("Erreur export", 'error', 3000); }
     };
 
-    /* ── États loading / error / no schema ────────────────────────── */
-    if (error) return (
-        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
-            <div className="bg-white border border-red-100 rounded-2xl shadow-sm p-8 max-w-lg w-full">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2.5 bg-red-50 rounded-xl"><AlertCircle className="w-6 h-6 text-red-400" /></div>
-                    <div>
-                        <h3 className="text-base font-semibold text-gray-900">Erreur de chargement</h3>
-                        <p className="text-xs text-gray-400">Impossible de charger les données</p>
-                    </div>
-                </div>
-                <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-5">
-                    <p className="text-sm text-red-700">{error}</p>
-                </div>
-                <div className="flex gap-3">
-                    <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700 transition-colors">
-                        <RefreshCw className="w-3.5 h-3.5" /> Réessayer
-                    </button>
-                    <button onClick={() => navigate(-1)}
-                            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
-                        Retour
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+    /* ── Données filtrées + triées ── */
+    const filteredData = useMemo(() => {
+        let rows = [...dataList];
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            rows = rows.filter(item =>
+                Object.values(item).some(v => String(v).toLowerCase().includes(q))
+            );
+        }
+        // Si jour unique (pas de dateTo), filtre exact sur dateFrom
+        if (dateFrom && !dateTo) {
+            rows = rows.filter(item => (item.date || '').slice(0, 10) === dateFrom);
+        } else {
+            if (dateFrom) rows = rows.filter(item => (item.date || '').slice(0, 10) >= dateFrom);
+            if (dateTo)   rows = rows.filter(item => (item.date || '').slice(0, 10) <= dateTo);
+        }
+        rows.sort((a, b) => {
+            const va = a[sortField] ?? '';
+            const vb = b[sortField] ?? '';
+            const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return rows;
+    }, [dataList, search, dateFrom, dateTo, sortField, sortDir]);
 
-    if (schemaLoading) return (
-        <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-[3px] border-cyan-100 border-t-cyan-500 animate-spin" />
-            <p className="text-sm text-gray-400">Chargement du formulaire…</p>
-        </div>
-    );
+    const hasFilters = search || dateFrom;
+    const clearFilters = () => { setSearch(''); setDateFrom(''); setDateTo(''); setHoverDay(null); };
 
-    if (!schema) return (
-        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
-            <div className="text-center max-w-sm">
-                <div className="p-4 bg-red-50 rounded-2xl inline-block mb-4"><AlertCircle className="w-12 h-12 text-red-300" /></div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Schéma introuvable</h3>
-                <p className="text-sm text-gray-400 mb-5">Code département: {deptCode}</p>
-                <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700 transition-colors">
-                    <RefreshCw className="w-3.5 h-3.5" /> Réessayer
-                </button>
-            </div>
-        </div>
-    );
-
-    /* ── Filtres & colonnes ────────────────────────────────────────── */
-    const filteredData = dataList.filter(item => {
-        const matchSearch = searchTerm === '' ||
-            Object.values(item).some(v => String(v).toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchDate = dateFilter === '' || item.date === dateFilter;
-        return matchSearch && matchDate;
-    });
-
-    const columns = [
+    /* ── Colonnes ── */
+    const columns = schema ? [
         {
             key: 'date', header: 'Date', sortable: true,
             render: (value) => (
@@ -233,11 +202,11 @@ export default function Data() {
         },
         ...schema.fields
             .filter(f => f.type === 'number' && f.key !== 'date')
-            .slice(0, 3)
+            .slice(0, 4)
             .map(field => ({
                 key: field.key, header: field.label, sortable: true,
                 render: (value) => (
-                    <span className="text-gray-800 font-medium text-sm tabular-nums">
+                    <span className="text-gray-700 font-medium text-sm tabular-nums">
                         {formatCellValue(value, field.key, field.type)}
                     </span>
                 ),
@@ -247,34 +216,81 @@ export default function Data() {
             render: (_, row) => (
                 <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => handleEdit(row)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modifier">
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                         <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => handleDelete(row.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Supprimer">
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
             ),
         },
-    ];
+    ] : [];
 
-    /* ── Render ────────────────────────────────────────────────────── */
+    /* ── États ── */
+    if (error) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
+            <div className="bg-white border border-red-100 rounded-2xl p-8 max-w-lg w-full">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2.5 bg-red-50 rounded-xl"><AlertCircle className="w-5 h-5 text-red-400" /></div>
+                    <h3 className="text-base font-semibold text-gray-900">Erreur de chargement</h3>
+                </div>
+                <p className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-5">{error}</p>
+                <div className="flex gap-3">
+                    <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700">
+                        <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+                    </button>
+                    <button onClick={() => navigate(-1)}
+                            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">
+                        Retour
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    if (schemaLoading) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 rounded-full border-[3px] border-cyan-100 border-t-cyan-500 animate-spin" />
+            <p className="text-sm text-gray-400">Chargement…</p>
+        </div>
+    );
+
+    if (!schema) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
+            <div className="text-center max-w-sm">
+                <div className="p-4 bg-red-50 rounded-2xl inline-block mb-4">
+                    <AlertCircle className="w-10 h-10 text-red-300" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">Schéma introuvable</h3>
+                <p className="text-xs text-gray-400 mb-5">Code : {deptCode}</p>
+                <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700">
+                    <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+                </button>
+            </div>
+        </div>
+    );
+
+    /* ── Render principal ── */
     return (
         <div className="min-h-screen bg-[#f8f9fc] p-6 md:p-8">
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
-                    <p className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest mb-1.5">
+                    <p className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest mb-1">
                         {schema.icon} Saisie de données
                     </p>
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
                         {schema.title || departmentDisplayName}
                     </h1>
-                    <p className="text-xs text-gray-400 mt-1">
-                        {schema.description || `Gérez vos saisies quotidiennes · ${departmentDisplayName}`}
+                    <p className="text-xs text-gray-400 mt-0.5">
+                        {filteredData.length} résultat{filteredData.length > 1 ? 's' : ''}
+                        {hasFilters ? ' · filtre actif' : ` · ${dataList.length} saisie${dataList.length > 1 ? 's' : ''} au total`}
                     </p>
                 </div>
                 <button onClick={handleCreate}
@@ -283,131 +299,194 @@ export default function Data() {
                 </button>
             </div>
 
-            {/* Stats cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                {[
-                    { label: "Total saisies",   value: stats.total,     sub: "Total général",    color: "blue",   icon: FileText,   subColor: "text-gray-400" },
-                    { label: "Ce mois",         value: stats.thisMonth, sub: `${stats.total > 0 ? Math.round((stats.thisMonth / stats.total) * 100) : 0}% du total`, color: "green",  icon: TrendingUp, subColor: "text-emerald-600" },
-                    { label: "Cette semaine",   value: stats.thisWeek,  sub: "Depuis lundi",     color: "purple", icon: Activity,   subColor: "text-purple-500" },
-                    { label: "Aujourd'hui",     value: stats.today,     sub: stats.today > 0 ? `${stats.today} saisie(s)` : "Aucune saisie", color: "amber", icon: Clock, subColor: "text-amber-500" },
-                ].map(({ label, value, sub, color, icon: Icon, subColor }, i) => {
-                    const palette = {
-                        blue:   { bar: "bg-blue-500",   iconBg: "bg-blue-50",   iconText: "text-blue-600"   },
-                        green:  { bar: "bg-emerald-500",iconBg: "bg-emerald-50",iconText: "text-emerald-600" },
-                        purple: { bar: "bg-purple-500", iconBg: "bg-purple-50", iconText: "text-purple-600"  },
-                        amber:  { bar: "bg-amber-400",  iconBg: "bg-amber-50",  iconText: "text-amber-600"   },
-                    };
-                    const c = palette[color];
-                    return (
-                        <div key={label}
-                             className="group bg-white rounded-2xl border border-gray-100 p-4 relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-slide-up"
-                             style={{ animationDelay: `${i * 60}ms` }}>
-                            <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl ${c.bar}`} />
-                            <div className="flex items-start justify-between mb-2 mt-0.5">
-                                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
-                                <div className={`p-1.5 ${c.iconBg} rounded-lg group-hover:scale-110 transition-transform duration-200`}>
-                                    <Icon className={`w-3.5 h-3.5 ${c.iconText}`} />
-                                </div>
-                            </div>
-                            <p className="text-2xl font-bold text-gray-900 tabular-nums tracking-tight mb-1">
-                                {formatNumberValue(value || 0)}
-                            </p>
-                            <p className={`text-[10px] font-medium ${subColor} flex items-center gap-1`}>
-                                {color === 'green' && <ArrowUpRight className="w-3 h-3" />}
-                                {sub}
-                            </p>
-                        </div>
-                    );
-                })}
-            </div>
+            {/* ── Barre de contrôle compacte ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-3 mb-4 flex flex-wrap items-center gap-2">
 
-            {/* Montants (conditionnel) */}
-            {amounts.totalAmount > 0 && (
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                    {[
-                        { label: "Montant total", value: formatMoneyFCFA(amounts.totalAmount), sub: "Cumul général",  bar: "bg-indigo-500",  iconBg: "bg-indigo-50",  iconText: "text-indigo-600",  delay: 240 },
-                        { label: "Montant mois",  value: formatMoneyFCFA(amounts.thisMonthAmount), sub: "Ce mois-ci", bar: "bg-emerald-500", iconBg: "bg-emerald-50", iconText: "text-emerald-600", delay: 300 },
-                    ].map(({ label, value, sub, bar, iconBg, iconText, delay }) => (
-                        <div key={label}
-                             className="group bg-white rounded-2xl border border-gray-100 p-4 relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-slide-up"
-                             style={{ animationDelay: `${delay}ms` }}>
-                            <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl ${bar}`} />
-                            <div className="flex items-start justify-between mb-2 mt-0.5">
-                                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
-                                <div className={`p-1.5 ${iconBg} rounded-lg`}>
-                                    <TrendingUp className={`w-3.5 h-3.5 ${iconText}`} />
-                                </div>
-                            </div>
-                            <p className="text-xl font-bold text-gray-900 tabular-nums tracking-tight mb-1">{value}</p>
-                            <p className="text-[10px] text-gray-400 font-medium">{sub}</p>
-                        </div>
-                    ))}
+                {/* Recherche — compacte */}
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Rechercher…"
+                        className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none w-40 transition-all focus:w-56"
+                    />
                 </div>
-            )}
 
-            {/* Filtres */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 animate-slide-up" style={{ animationDelay: '360ms' }}>
-                <div className="flex items-center gap-2 mb-3">
-                    <Filter className="w-3.5 h-3.5 text-gray-300" />
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Filtres</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex-1 min-w-[220px] relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
-                        <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                               placeholder="Rechercher…"
-                               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all" />
-                    </div>
-                    <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
-                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all w-40" />
-                    <button onClick={handleExport}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 font-medium transition-colors text-gray-600">
-                        <Download className="w-3.5 h-3.5" /> Exporter
+                {/* Séparateur */}
+                <div className="w-px h-5 bg-gray-200" />
+
+                {/* Calendrier custom — jour unique ou range */}
+                <div className="relative">
+                    <button
+                        onClick={() => setCalOpen(o => !o)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${
+                            dateFrom
+                                ? 'border-cyan-300 bg-cyan-50 text-cyan-700 font-semibold'
+                                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}>
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                        {calLabel()}
+                        {dateFrom && (
+                            <span onClick={e => { e.stopPropagation(); clearFilters(); }}
+                                  className="ml-0.5 hover:text-red-500 transition-colors">
+                                <X className="w-3 h-3" />
+                            </span>
+                        )}
                     </button>
-                    {(searchTerm || dateFilter) && (
-                        <button onClick={() => { setSearchTerm(''); setDateFilter(''); }}
-                                className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold">
-                            Réinitialiser
-                        </button>
+
+                    {calOpen && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => { setCalOpen(false); setHoverDay(null); if (dateFrom && !dateTo) { setDateTo(dateFrom); } }} />
+                            <div className="absolute top-full left-0 mt-1.5 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 p-3 w-64 select-none">
+
+                                {/* Nav mois */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
+                                        <ChevronDown className="w-3.5 h-3.5 rotate-90" />
+                                    </button>
+                                    <span className="text-xs font-semibold text-gray-700">
+                                        {MONTHS_FR[calMonth]} {calYear}
+                                    </span>
+                                    <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
+                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                                    </button>
+                                </div>
+
+                                {/* Jours de la semaine */}
+                                <div className="grid grid-cols-7 mb-1">
+                                    {DAYS_FR.map(d => (
+                                        <div key={d} className="text-center text-[10px] font-semibold text-gray-400 py-1">{d}</div>
+                                    ))}
+                                </div>
+
+                                {/* Cases du mois */}
+                                <div className="grid grid-cols-7">
+                                    {/* Décalage premier jour (lundi=0) */}
+                                    {Array.from({ length: (firstDayOfMonth(calYear, calMonth) + 6) % 7 }).map((_, i) => (
+                                        <div key={`e${i}`} />
+                                    ))}
+                                    {Array.from({ length: daysInMonth(calYear, calMonth) }).map((_, i) => {
+                                        const day = i + 1;
+                                        const ymd = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                                        const inRange  = isDayInRange(ymd);
+                                        const isStart  = isDayStart(ymd);
+                                        const isEnd    = isDayEnd(ymd);
+                                        const isToday  = ymd === toYMD(new Date());
+                                        return (
+                                            <button
+                                                key={ymd}
+                                                onClick={() => handleCalDay(ymd)}
+                                                onMouseEnter={() => { if (dateFrom && !dateTo) setHoverDay(ymd); }}
+                                                onMouseLeave={() => setHoverDay(null)}
+                                                className={`relative h-7 w-full text-[11px] font-medium transition-colors
+                                                    ${inRange && !isStart && !isEnd ? 'bg-cyan-50 text-cyan-700 rounded-none' : ''}
+                                                    ${isStart ? 'bg-cyan-500 text-white rounded-l-lg' : ''}
+                                                    ${isEnd   ? 'bg-cyan-500 text-white rounded-r-lg' : ''}
+                                                    ${!inRange ? 'hover:bg-gray-100 rounded-lg text-gray-700' : ''}
+                                                    ${isToday && !inRange ? 'font-bold text-cyan-600' : ''}
+                                                `}>
+                                                {day}
+                                                {isToday && !isStart && !isEnd && (
+                                                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-cyan-400" />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Footer hint */}
+                                <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-between">
+                                    <p className="text-[10px] text-gray-400">
+                                        {!dateFrom ? 'Cliquez pour sélectionner' : !dateTo ? 'Cliquez pour définir la fin' : ''}
+                                    </p>
+                                    {dateFrom && (
+                                        <button onClick={() => { setDateFrom(''); setDateTo(''); setHoverDay(null); }}
+                                                className="text-[10px] text-red-400 hover:text-red-600 font-medium">
+                                            Effacer
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
+
+                {/* Séparateur */}
+                <div className="w-px h-5 bg-gray-200" />
+
+                {/* Tri */}
+                <div className="flex items-center gap-1.5">
+                    <select
+                        value={sortField}
+                        onChange={e => setSortField(e.target.value)}
+                        className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none text-gray-600 bg-white">
+                        <option value="date">Date</option>
+                        {schema.fields.filter(f => f.type === 'number').slice(0, 4).map(f => (
+                            <option key={f.key} value={f.key}>{f.label}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                        className="p-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-500"
+                        title={sortDir === 'asc' ? 'Croissant' : 'Décroissant'}>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* Clear filtres */}
+                {hasFilters && (
+                    <button onClick={clearFilters}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:text-red-500 border border-gray-200 rounded-lg hover:border-red-200 hover:bg-red-50 transition-colors">
+                        <X className="w-3 h-3" /> Réinitialiser
+                    </button>
+                )}
+
+                {/* Export */}
+                <button onClick={handleExport}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 font-medium transition-colors text-gray-600">
+                    <Download className="w-3.5 h-3.5" /> Exporter
+                </button>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-fade-in">
+            {/* ── Table ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-14 gap-3">
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
                         <div className="w-9 h-9 rounded-full border-[3px] border-cyan-100 border-t-cyan-500 animate-spin" />
                         <p className="text-sm text-gray-400">Chargement…</p>
                     </div>
                 ) : filteredData.length === 0 ? (
-                    <div className="text-center py-14">
+                    <div className="text-center py-16">
                         <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                            <Calendar className="w-7 h-7 text-gray-200" />
+                            <Calendar className="w-6 h-6 text-gray-200" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-900 mb-1">Aucune donnée</h3>
-                        <p className="text-xs text-gray-400 mb-5">
-                            {searchTerm || dateFilter ? "Aucun résultat pour ces filtres" : "Créez votre première saisie"}
+                        <p className="text-sm font-semibold text-gray-700 mb-1">
+                            {hasFilters ? 'Aucun résultat' : 'Aucune saisie'}
                         </p>
-                        {!searchTerm && !dateFilter && (
+                        <p className="text-xs text-gray-400 mb-5">
+                            {hasFilters ? 'Essayez de modifier les filtres' : 'Commencez par créer une saisie'}
+                        </p>
+                        {!hasFilters && (
                             <button onClick={handleCreate}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-700 transition-colors">
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-700">
                                 <Plus className="w-4 h-4" /> Nouvelle saisie
+                            </button>
+                        )}
+                        {hasFilters && (
+                            <button onClick={clearFilters}
+                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50">
+                                <X className="w-3.5 h-3.5" /> Effacer les filtres
                             </button>
                         )}
                     </div>
                 ) : (
-                    <Table columns={columns} data={filteredData} sortable hoverable emptyMessage="Aucune donnée trouvée" />
+                    <Table columns={columns} data={filteredData} sortable hoverable emptyMessage="Aucune donnée" />
                 )}
-            </div>
-
-            {/* Info banner */}
-            <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 animate-fade-in">
-                <p className="text-xs text-blue-700">
-                    <span className="font-semibold">💡 Astuce :</span> Les statistiques reflètent le nombre de saisies par période.
-                    Le tableau de bord comptabilité se met à jour automatiquement dès votre retour sur la page.
-                    {amounts.totalAmount > 0 && " Les montants sont également calculés automatiquement."}
-                </p>
             </div>
 
             {/* Modal */}
@@ -425,15 +504,10 @@ export default function Data() {
 
             <style>{`
                 @keyframes slide-up {
-                    from { opacity: 0; transform: translateY(10px); }
+                    from { opacity: 0; transform: translateY(8px); }
                     to   { opacity: 1; transform: translateY(0); }
                 }
-                @keyframes fade-in {
-                    from { opacity: 0; }
-                    to   { opacity: 1; }
-                }
-                .animate-slide-up { animation: slide-up 0.35s ease-out forwards; opacity: 0; }
-                .animate-fade-in  { animation: fade-in 0.4s ease-out; }
+                .animate-slide-up { animation: slide-up 0.3s ease-out forwards; opacity: 0; }
                 .tabular-nums     { font-variant-numeric: tabular-nums; }
             `}</style>
         </div>
