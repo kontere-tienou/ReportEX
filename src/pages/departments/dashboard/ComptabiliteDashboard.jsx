@@ -1,735 +1,605 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
-    TrendingUp,
-    FileText,
-    ArrowUpRight,
-    ArrowDownRight,
-    Clock,
-    CheckCircle2,
-    AlertCircle,
-    Wallet,
-    CreditCard,
-    Calendar,
+    TrendingUp, TrendingDown, FileText, ArrowUpRight, ArrowDownRight,
+    AlertCircle, Wallet, ShoppingCart, Calculator, RefreshCw,
 } from "lucide-react";
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Area,
-    AreaChart,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, Area, AreaChart, PieChart as RePieChart,
+    Pie, Cell, LineChart, Line, Legend,
 } from "recharts";
 
-import { departmentDataApi } from "../../../services/departmentDataApi.js";
-import {
-    formatMoneyFCFA,
-    formatNumberValue,
-} from "../reports/builder/utils/tableFormaterUtils.js";
+import { dataService } from "../../../services/dataService.js";
+import { formatMoneyFCFA, formatNumberValue } from "../reports/builder/utils/tableFormaterUtils.js";
 
 const DEPT_CODE = "COMPTABILITE";
 
-/**
- * ==========================================
- * FIELD MAPPING
- * ==========================================
- */
-const FIELD_MAP = {
-    caisse_entrees: "caisse_entrees",
-    caisse_sorties: "caisse_sorties",
-    solde_caisse: "solde_caisse",
-    ca: "ca",
+const PERIOD_TYPES  = { DAY: "day", WEEK: "week", MONTH: "month", QUARTER: "quarter", YEAR: "year" };
+const PERIOD_LABELS = { day: "Jour", week: "Sem.", month: "Mois", quarter: "Trim.", year: "Année" };
+
+/* ─── Helpers ────────────────────────────────────────────────────── */
+const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+const fmt = (v) => {
+    const n = safeNum(v);
+    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}Md`;
+    if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}K`;
+    return formatNumberValue(n);
 };
 
-/**
- * Types de période
- */
-const PERIOD_TYPES = {
-    DAY: "day",
-    WEEK: "week",
-    MONTH: "month",
-    YEAR: "year",
+/* ─── Filtre par période ─────────────────────────────────────────── */
+const filterDataByPeriod = (data, periodType) => {
+    const dateTo = new Date().toISOString().split("T")[0];
+    let dateFrom;
+    const offsets = {
+        // Jour    → 30 derniers jours  (chaque point = 1 jour)
+        day:     () => { const d = new Date(); d.setDate(d.getDate() - 30);        return d; },
+        // Semaine → 7 derniers jours   (chaque point = 1 jour de la semaine)
+        week:    () => { const d = new Date(); d.setDate(d.getDate() - 7);         return d; },
+        // Mois    → 12 derniers mois   (chaque point = 1 mois)
+        month:   () => { const d = new Date(); d.setMonth(d.getMonth() - 12);      return d; },
+        // Trim.   → 2 ans              (chaque point = 1 trimestre)
+        quarter: () => { const d = new Date(); d.setMonth(d.getMonth() - 24);      return d; },
+        // Année   → 5 ans              (chaque point = 1 année)
+        year:    () => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return d; },
+    };
+    dateFrom = (offsets[periodType] || offsets.month)().toISOString().split("T")[0];
+    return data.filter(item => {
+        const d = (item.date || "").slice(0, 10);
+        return d >= dateFrom && d <= dateTo;
+    });
 };
 
-const PERIOD_LABELS = {
-    [PERIOD_TYPES.DAY]: "Jour",
-    [PERIOD_TYPES.WEEK]: "Semaine",
-    [PERIOD_TYPES.MONTH]: "Mois",
-    [PERIOD_TYPES.YEAR]: "Année",
-};
-
-// Cache pour stocker les données par période
-const dataCache = new Map();
-
-/**
- * Format compact pour grandes valeurs
- */
-const formatCompactCurrency = (value) => {
-    const num = Number(value || 0);
-    if (Number.isNaN(num)) return "—";
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-    return formatNumberValue(num);
-};
-
-const calcPercent = (num, den) => {
-    if (!den) return 0;
-    return Math.round((Number(num) / Number(den)) * 100);
-};
-
-const getMonthLabel = (dateValue) => {
-    const d = new Date(dateValue);
-    if (Number.isNaN(d.getTime())) return String(dateValue);
-    return d.toLocaleDateString("fr-FR", { month: "short" });
-};
-
-const getWeekLabel = (dateValue) => {
-    const d = new Date(dateValue);
-    if (Number.isNaN(d.getTime())) return String(dateValue);
-    const weekNumber = Math.ceil(d.getDate() / 7);
-    return `S${weekNumber}`;
-};
-
-const getDayLabel = (dateValue) => {
-    const d = new Date(dateValue);
-    if (Number.isNaN(d.getTime())) return String(dateValue);
-    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
-};
-
-const getYearLabel = (dateValue) => {
-    const d = new Date(dateValue);
-    if (Number.isNaN(d.getTime())) return String(dateValue);
-    return d.getFullYear().toString();
-};
-
-/**
- * Agrégation par période
- */
+/* ─── Agrégation par période ─────────────────────────────────────── */
 const aggregateByPeriod = (rows, periodType) => {
     const map = new Map();
-
     rows.forEach((row) => {
-        const rawDate = row.date;
+        const rawDate = (row.date || "").slice(0, 10);
+        if (!rawDate) return;
+
         let key, label;
+        const dt = new Date(rawDate + "T12:00:00");
 
         switch (periodType) {
-            case PERIOD_TYPES.DAY:
-                key = rawDate?.slice?.(0, 10) || rawDate;
-                label = getDayLabel(rawDate);
+            // Jour → label = "Lun 21", "Mar 22", etc.
+            case "day":
+                key   = rawDate;
+                label = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
                 break;
-            case PERIOD_TYPES.WEEK:
-                key = `${rawDate?.slice?.(0, 7)}-W${Math.ceil(new Date(rawDate).getDate() / 7)}`;
-                label = getWeekLabel(rawDate);
+            // Semaine → label = chaque jour de la semaine "Lun 16 mars", "Mar 17 mars"…
+            // On regroupe par semaine ISO (lundi→dimanche) mais affiche le jour précis
+            case "week": {
+                // Clé = date exacte (un point par jour)
+                key   = rawDate;
+                label = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
                 break;
-            case PERIOD_TYPES.MONTH:
-                key = rawDate?.slice?.(0, 7) || rawDate;
-                label = getMonthLabel(rawDate);
+            }
+            // Mois → label = "mars 25", "avr 25"
+            case "month":
+                key   = rawDate.slice(0, 7);
+                label = dt.toLocaleDateString("fr-FR", { month: "long", year: "2-digit" });
                 break;
-            case PERIOD_TYPES.YEAR:
-                key = rawDate?.slice?.(0, 4) || rawDate;
-                label = getYearLabel(rawDate);
+            // Trimestre → label = "T1 2025", "T2 2025"
+            case "quarter": {
+                const q = Math.floor(dt.getMonth() / 3) + 1;
+                key   = `${rawDate.slice(0, 4)}-T${q}`;
+                label = `T${q} ${rawDate.slice(0, 4)}`;
+                break;
+            }
+            // Année → label = "2024", "2025"
+            case "year":
+                key = label = rawDate.slice(0, 4);
                 break;
             default:
-                key = rawDate?.slice?.(0, 7) || rawDate;
-                label = getMonthLabel(rawDate);
+                key   = rawDate.slice(0, 7);
+                label = dt.toLocaleDateString("fr-FR", { month: "long", year: "2-digit" });
         }
 
         if (!map.has(key)) {
-            map.set(key, {
-                periode: label,
-                entrees: 0,
-                sorties: 0,
-                solde: 0,
-            });
+            map.set(key, { periode: label, ca: 0, commandes: 0, entrees: 0, sorties: 0, solde: 0 });
         }
-
-        const current = map.get(key);
-        current.entrees += Number(row.caisse_entrees || 0);
-        current.sorties += Number(row.caisse_sorties || 0);
-        current.solde += Number(row.solde_caisse || 0);
+        const cur = map.get(key);
+        cur.ca        += safeNum(row.ca);
+        cur.commandes += safeNum(row.commandes);
+        cur.entrees   += safeNum(row.caisse_entrees);
+        cur.sorties   += safeNum(row.caisse_sorties);
+        cur.solde     += safeNum(row.solde_caisse);
     });
 
     return [...map.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([, value]) => value);
+        .map(([, v]) => ({ ...v, marge: v.entrees - v.sorties, panierMoyen: v.commandes > 0 ? v.ca / v.commandes : 0 }));
 };
 
-/**
- * Calcul des dates en fonction de la période
- */
-const getDateRange = (periodType) => {
-    const now = new Date();
-    const dateTo = now.toISOString().split("T")[0];
-    let dateFrom;
-
-    switch (periodType) {
-        case PERIOD_TYPES.DAY:
-            dateFrom = new Date(now.setDate(now.getDate() - 7)).toISOString().split("T")[0];
-            break;
-        case PERIOD_TYPES.WEEK:
-            dateFrom = new Date(now.setDate(now.getDate() - 28)).toISOString().split("T")[0];
-            break;
-        case PERIOD_TYPES.MONTH:
-            dateFrom = new Date(now.setMonth(now.getMonth() - 6)).toISOString().split("T")[0];
-            break;
-        case PERIOD_TYPES.YEAR:
-            dateFrom = new Date(now.setFullYear(now.getFullYear() - 3)).toISOString().split("T")[0];
-            break;
-        default:
-            dateFrom = new Date(now.setMonth(now.getMonth() - 6)).toISOString().split("T")[0];
-    }
-
-    return { dateFrom, dateTo };
-};
-
-/**
- * Custom Tooltip
- */
-const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-
+/* ─── Composants UI ──────────────────────────────────────────────── */
+const PeriodFilter = ({ selected, onChange }) => {
+    const [clicked, setClicked] = useState(null);
     return (
-        <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg text-xs animate-fade-in">
-            <p className="font-semibold text-gray-700 mb-1">{label}</p>
-            {payload.map((p, i) => (
-                <p key={i} style={{ color: p.color }} className="my-0.5">
-                    {p.name}: {formatMoneyFCFA(p.value)}
-                </p>
-            ))}
-        </div>
-    );
-};
-
-/**
- * KPI Card Component
- */
-const KpiCard = ({ label, value, sub, subPositive, icon: Icon, color, delay = 0 }) => {
-    const colors = {
-        green: { border: "border-l-green-500", bg: "bg-green-50", text: "text-green-600" },
-        red: { border: "border-l-red-500", bg: "bg-red-50", text: "text-red-600" },
-        purple: { border: "border-l-purple-500", bg: "bg-purple-50", text: "text-purple-600" },
-        blue: { border: "border-l-blue-500", bg: "bg-blue-50", text: "text-blue-600" },
-    };
-    const c = colors[color];
-
-    return (
-        <div
-            className={`group bg-white rounded-xl shadow-sm border border-l-4 ${c.border} p-3 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-slide-up`}
-            style={{ animationDelay: `${delay}ms` }}
-        >
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                    {label}
-                </span>
-                <div className={`${c.bg} p-1.5 rounded-lg group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className={`w-4 h-4 ${c.text}`} />
-                </div>
-            </div>
-
-            <p className="text-2xl font-bold text-gray-900 mb-0.5 tabular-nums">
-                {value}
-            </p>
-
-            {sub && (
-                <p className={`text-[10px] flex items-center gap-1 ${
-                    subPositive === undefined ? "text-gray-500" : subPositive ? "text-green-600" : "text-red-500"
-                }`}>
-                    {subPositive !== undefined && (
-                        subPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />
-                    )}
-                    {sub}
-                </p>
-            )}
-        </div>
-    );
-};
-
-/**
- * Stat Pill Component
- */
-const StatPill = ({ label, value, color, icon: Icon }) => {
-    const colors = {
-        gray: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-700" },
-        green: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
-        amber: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
-        red: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
-    };
-    const c = colors[color];
-
-    return (
-        <div className={`${c.bg} border ${c.border} rounded-lg px-4 py-3 flex items-center justify-between group hover:shadow-md transition-all duration-300`}>
-            <div className="flex items-center gap-2">
-                <Icon className={`w-4 h-4 ${c.text} group-hover:scale-110 transition-transform duration-300`} />
-                <span className="text-xs text-gray-600 font-medium">{label}</span>
-            </div>
-            <span className={`text-xl font-bold ${c.text} tabular-nums`}>{value}</span>
-        </div>
-    );
-};
-
-/**
- * Legend Dot Component
- */
-const LegendDot = ({ color, label }) => (
-    <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-        <span className="w-2 h-2 rounded-sm" style={{ background: color }} />
-        {label}
-    </span>
-);
-
-/**
- * Filtre de période - Version sans rechargement
- */
-const PeriodFilter = ({ selectedPeriod, onPeriodChange }) => {
-    // État local pour l'animation du clic
-    const [clickedButton, setClickedButton] = useState(null);
-
-    const handleClick = (period) => {
-        setClickedButton(period);
-        onPeriodChange(period);
-        // Retirer l'effet de clic après 200ms
-        setTimeout(() => setClickedButton(null), 200);
-    };
-
-    return (
-        <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border p-1">
-            <Calendar className="w-4 h-4 text-gray-400 ml-2" />
-            {Object.entries(PERIOD_LABELS).map(([value, label]) => (
-                <button
-                    key={value}
-                    onClick={() => handleClick(value)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                        selectedPeriod === value
-                            ? "bg-green-600 text-white shadow-sm"
-                            : "text-gray-600 hover:bg-gray-100"
-                    } ${
-                        clickedButton === value ? "scale-95" : ""
-                    }`}
-                >
-                    {label}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            {Object.entries(PERIOD_LABELS).map(([val, lbl]) => (
+                <button key={val} onClick={() => { setClicked(val); onChange(val); setTimeout(() => setClicked(null), 150); }}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150
+                        ${selected === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}
+                        ${clicked === val ? "scale-95" : ""}`}>
+                    {lbl}
                 </button>
             ))}
         </div>
     );
 };
 
-/**
- * ==========================================
- * MAIN DASHBOARD COMPONENT
- * ==========================================
- */
+const SectionHeader = ({ number, title }) => (
+    <div className="flex items-center gap-3 mb-4">
+        <span className="text-[10px] font-bold text-gray-400 font-mono">{number}</span>
+        <div className="h-px flex-1 bg-gray-100" />
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{title}</span>
+        <div className="h-px flex-1 bg-gray-100" />
+    </div>
+);
+
+const ChartCard = ({ title, sub, children, className = "" }) => (
+    <div className={`bg-white rounded-2xl border border-gray-100 p-5 ${className}`}>
+        <div className="mb-4">
+            <h2 className="text-sm font-semibold text-gray-800 tracking-tight">{title}</h2>
+            {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+        </div>
+        {children}
+    </div>
+);
+
+const CustomTooltip = ({ active, payload, label, fmt: fmtFn }) => {
+    if (!active || !payload?.length) return null;
+    return (
+        <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2 text-xs min-w-[140px]">
+            <p className="font-semibold text-gray-500 mb-1.5">{label}</p>
+            {payload.map((p, i) => (
+                <div key={i} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                        <span className="text-gray-500">{p.name}</span>
+                    </div>
+                    <span className="font-semibold text-gray-800 tabular-nums">
+                        {fmtFn ? fmtFn(p.value, p.name) : p.value}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+/* ─── DASHBOARD ──────────────────────────────────────────────────── */
 const ComptabiliteDashboard = () => {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const [loading,        setLoading]        = useState(true);
+    const [error,          setError]          = useState("");
     const [selectedPeriod, setSelectedPeriod] = useState(PERIOD_TYPES.MONTH);
-    const [stats, setStats] = useState({ total: 0, thisMonth: 0, thisWeek: 0, today: 0 });
-    const [cashFlowData, setCashFlowData] = useState([]);
-    const [balanceData, setBalanceData] = useState([]);
-    const [reportStats, setReportStats] = useState({ total: 0, validated: 0, pending: 0, rejected: 0 });
+    const [isUpdating,     setIsUpdating]     = useState(false);
+    const [allData,        setAllData]        = useState([]);
 
-    // État pour suivre si les données sont en cours de mise à jour
-    const [isUpdating, setIsUpdating] = useState(false);
+    /* ── Fetch ── */
+    const silentRefresh = async () => {
+        try {
+            const data = await dataService.getAll(DEPT_CODE);
+            setAllData(Array.isArray(data) ? data : data?.data ?? []);
+        } catch { /* silencieux */ }
+    };
 
-    // État pour les données brutes (une seule fois)
-    const [rawData, setRawData] = useState(null);
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const data = await dataService.getAll(DEPT_CODE);
+            setAllData(Array.isArray(data) ? data : data?.data ?? []);
+        } catch (err) { setError(err.message || "Erreur de chargement"); }
+        finally { setLoading(false); }
+    };
 
-    const now = useMemo(() => new Date(), []);
-
-    // Ne pas recalculer les dates à chaque changement de période
-    const dateRanges = useMemo(() => ({
-        [PERIOD_TYPES.DAY]: getDateRange(PERIOD_TYPES.DAY),
-        [PERIOD_TYPES.WEEK]: getDateRange(PERIOD_TYPES.WEEK),
-        [PERIOD_TYPES.MONTH]: getDateRange(PERIOD_TYPES.MONTH),
-        [PERIOD_TYPES.YEAR]: getDateRange(PERIOD_TYPES.YEAR),
-    }), []);
-
-    /**
-     * Chargement initial des données - une seule fois
-     */
+    useEffect(() => { loadData(); }, []);
     useEffect(() => {
-        const fetchInitialData = async () => {
-            try {
-                setLoading(true);
-                setError("");
-
-                // Charger les données pour toutes les périodes en parallèle
-                const promises = Object.values(PERIOD_TYPES).map(async (period) => {
-                    const range = dateRanges[period];
-                    const cacheKey = `${period}_${range.dateFrom}_${range.dateTo}`;
-
-                    // Vérifier le cache
-                    if (dataCache.has(cacheKey)) {
-                        return { period, data: dataCache.get(cacheKey) };
-                    }
-
-                    const response = await departmentDataApi.getBatchChartData(DEPT_CODE, {
-                        dateFrom: range.dateFrom,
-                        dateTo: range.dateTo,
-                        groupBy: "date",
-                        metrics: [
-                            { field: FIELD_MAP.caisse_entrees, aggregation: "sum" },
-                            { field: FIELD_MAP.caisse_sorties, aggregation: "sum" },
-                            { field: FIELD_MAP.solde_caisse, aggregation: "sum" },
-                        ],
-                    });
-
-                    const data = response.data?.data || response.data || [];
-                    dataCache.set(cacheKey, data);
-                    return { period, data };
-                });
-
-                // Ajouter les stats
-                const statsPromise = departmentDataApi.getStats(DEPT_CODE);
-
-                const [statsRes, ...periodsData] = await Promise.all([
-                    statsPromise,
-                    ...promises
-                ]);
-
-                const statsData = statsRes.data?.data || statsRes.data || {};
-
-                // Organiser les données par période
-                const organizedData = {};
-                periodsData.forEach(({ period, data }) => {
-                    organizedData[period] = data;
-                });
-
-                setRawData(organizedData);
-                setStats({
-                    total: Number(statsData.total || 0),
-                    thisMonth: Number(statsData.thisMonth || 0),
-                    thisWeek: Number(statsData.thisWeek || 0),
-                    today: Number(statsData.today || 0),
-                });
-
-                setReportStats({
-                    total: Number(statsData.total || 0),
-                    validated: Math.floor(Number(statsData.total || 0) * 0.7),
-                    pending: Math.floor(Number(statsData.total || 0) * 0.2),
-                    rejected: Math.floor(Number(statsData.total || 0) * 0.1),
-                });
-
-            } catch (err) {
-                console.error("Dashboard error:", err);
-                setError(err.response?.data?.message || err.message || "Erreur de chargement");
-            } finally {
-                setLoading(false);
+        const iv = setInterval(silentRefresh, 30_000);
+        return () => clearInterval(iv);
+    }, []);
+    useEffect(() => {
+        const onChange = (e) => {
+            if (!e.detail?.deptCode || e.detail.deptCode === DEPT_CODE) {
+                setIsUpdating(true);
+                silentRefresh().finally(() => setIsUpdating(false));
             }
         };
-
-        fetchInitialData();
-    }, []); // Dépendances vides = chargement unique
-
-    /**
-     * Mise à jour des données affichées quand la période change
-     */
+        window.addEventListener("dataservice:changed", onChange);
+        return () => window.removeEventListener("dataservice:changed", onChange);
+    }, []);
     useEffect(() => {
-        if (!rawData) return;
+        const onVisible = () => {
+            if (document.visibilityState === "visible") {
+                setIsUpdating(true);
+                silentRefresh().finally(() => setIsUpdating(false));
+            }
+        };
+        document.addEventListener("visibilitychange", onVisible);
+        return () => document.removeEventListener("visibilitychange", onVisible);
+    }, []);
 
-        setIsUpdating(true);
+    /* ── Données filtrées & agrégées (réactives à selectedPeriod) ── */
+    const filtered   = filterDataByPeriod(allData, selectedPeriod);
+    const aggregated = aggregateByPeriod(filtered, selectedPeriod);
 
-        // Simuler un délai pour montrer l'animation de transition
-        const timeout = setTimeout(() => {
-            const periodData = rawData[selectedPeriod] || [];
+    const current  = aggregated[aggregated.length - 1] || {};
+    const previous = aggregated[aggregated.length - 2] || {};
 
-            const normalizedDailyRows = Array.isArray(periodData)
-                ? periodData.map((row) => ({
-                    date: row.date,
-                    caisse_entrees: Number(row.caisse_entrees || 0),
-                    caisse_sorties: Number(row.caisse_sorties || 0),
-                    solde_caisse: Number(row.solde_caisse || 0),
-                }))
-                : [];
+    const totalCA       = aggregated.reduce((s, m) => s + m.ca,        0);
+    const totalEntrees  = aggregated.reduce((s, m) => s + m.entrees,   0);
+    const totalSorties  = aggregated.reduce((s, m) => s + m.sorties,   0);
+    const totalCmds     = aggregated.reduce((s, m) => s + m.commandes, 0);
+    const margeBrute    = totalEntrees - totalSorties;
+    const tauxMarge     = totalEntrees > 0 ? (margeBrute / totalEntrees) * 100 : 0;
+    const panierGlobal  = totalCmds  > 0 ? totalCA / totalCmds : 0;
 
-            const aggregated = aggregateByPeriod(normalizedDailyRows, selectedPeriod);
+    const trend = (cur, prev) => prev ? Math.round(((cur - prev) / prev) * 100) : 0;
+    const caTrend  = trend(current.ca        ?? 0, previous.ca        ?? 0);
+    const cmdTrend = trend(current.commandes ?? 0, previous.commandes ?? 0);
 
-            setCashFlowData(aggregated.map((m) => ({
-                periode: m.periode,
-                entrees: m.entrees,
-                sorties: m.sorties
-            })));
+    /* ── Données pour les graphiques ── */
+    // 1) Évolution CA + Marge (line chart)
+    const evolutionData = aggregated.map(m => ({
+        periode: m.periode,
+        CA:      m.ca,
+        Marge:   m.marge,
+        Entrées: m.entrees,
+        Sorties: m.sorties,
+    }));
 
-            setBalanceData(aggregated.map((m) => ({
-                periode: m.periode,
-                solde: m.solde
-            })));
+    // 2) Flux trésorerie (bar chart)
+    const fluxData = aggregated.map(m => ({
+        periode: m.periode,
+        Entrées: m.entrees,
+        Sorties: m.sorties,
+    }));
 
-            setIsUpdating(false);
-        }, 300); // Petit délai pour l'animation
+    // 3) Répartition Entrées vs Sorties (donut)
+    const donutFlux = [
+        { name: "Entrées", value: totalEntrees },
+        { name: "Sorties", value: totalSorties },
+    ];
 
-        return () => clearTimeout(timeout);
-    }, [selectedPeriod, rawData]);
+    // 4) Panier moyen (line)
+    const panierData = aggregated.map(m => ({ periode: m.periode, "Panier moyen": m.panierMoyen }));
 
-    const currentEntrees = cashFlowData.length > 0 ? cashFlowData[cashFlowData.length - 1].entrees : 0;
-    const currentSorties = cashFlowData.length > 0 ? cashFlowData[cashFlowData.length - 1].sorties : 0;
-    const currentSolde = balanceData.length > 0 ? balanceData[balanceData.length - 1].solde : 0;
-    const totalEntrees = cashFlowData.reduce((sum, m) => sum + m.entrees, 0);
-    const totalSorties = cashFlowData.reduce((sum, m) => sum + m.sorties, 0);
-    const activityPct = calcPercent(stats.thisMonth, stats.total);
-    const validationRate = calcPercent(reportStats.validated, reportStats.total);
+    // 5) Solde cumulé (area)
+    let cumul = 0;
+    const soldeData = aggregated.map(m => { cumul += m.marge; return { periode: m.periode, Solde: cumul }; });
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-                <div className="w-12 h-12 rounded-full border-4 border-green-100 border-t-green-600 animate-spin" />
-                <p className="text-sm text-gray-500 animate-pulse">Chargement...</p>
-            </div>
-        );
-    }
+    // 6) Répartition CA par période (donut — max 6 périodes)
+    const caSlice = aggregated.slice(-6);
+    const COLORS  = ["#3b82f6","#10b981","#f59e0b","#8b5cf6","#ef4444","#06b6d4"];
+    const donutCA = caSlice.map(m => ({ name: m.periode, value: m.ca }));
 
-    if (error) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-                <div className="bg-white border border-red-100 rounded-xl shadow-sm p-6 max-w-md animate-fade-in">
-                    <div className="flex items-center gap-3 mb-3">
-                        <AlertCircle className="text-red-500 w-6 h-6" />
-                        <h2 className="text-lg font-bold text-gray-900">Erreur</h2>
-                    </div>
-                    <p className="text-sm text-gray-600">{error}</p>
+    const axisTick  = { fontSize: 10, fill: "#9ca3af" };
+    const gridColor = "#f3f4f6";
+
+    /* ── États ── */
+    if (loading) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 rounded-full border-[3px] border-blue-100 border-t-blue-500 animate-spin" />
+            <p className="text-sm text-gray-400">Chargement…</p>
+        </div>
+    );
+
+    if (error) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
+            <div className="bg-white border border-red-100 rounded-2xl p-6 max-w-md w-full">
+                <div className="flex items-center gap-3 mb-3">
+                    <AlertCircle className="text-red-400 w-5 h-5" />
+                    <h2 className="text-base font-semibold text-gray-900">Erreur</h2>
                 </div>
+                <p className="text-sm text-gray-500 mb-4">{error}</p>
+                <button onClick={loadData} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700">Réessayer</button>
             </div>
-        );
-    }
+        </div>
+    );
+
+    if (allData.length === 0) return (
+        <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-6">
+            <div className="bg-white rounded-2xl border border-gray-100 p-10 max-w-md text-center">
+                <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-7 h-7 text-gray-300" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Aucune donnée</h2>
+                <p className="text-sm text-gray-400 mb-5">Commencez par saisir des données comptables.</p>
+                <button onClick={() => window.location.href = `/departments/data/${DEPT_CODE.toLowerCase()}`}
+                        className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700">
+                    Aller à la saisie
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6 md:p-8">
-            {/* Header avec filtre */}
-            <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 mb-6 pb-4 border-b border-gray-200">
-                <div className="animate-slide-up">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">
-                        💰 Tableau de Bord
-                    </p>
-                    <h1 className="text-3xl font-bold text-gray-900">Comptabilité</h1>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Flux de Trésorerie · Budget · Suivi
+        <div className="min-h-screen bg-[#f8f9fc] p-6 md:p-8">
+
+            {/* ── HEADER ── */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+                <div>
+                    <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-widest mb-1.5">Département Comptabilité</p>
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Tableau de Bord</h1>
+                    <p className="text-xs text-gray-400 mt-1 font-medium">
+                        {filtered.length} saisie{filtered.length > 1 ? "s" : ""} dans la période · {allData.length} au total
                     </p>
                 </div>
-
-                <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: '100ms' }}>
-                    <PeriodFilter
-                        selectedPeriod={selectedPeriod}
-                        onPeriodChange={setSelectedPeriod}
-                    />
-
-                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-3 py-1.5">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[10px] text-green-700 font-medium">En temps réel</span>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* Filtre période — impacte TOUT le dashboard */}
+                    <PeriodFilter selected={selectedPeriod} onChange={setSelectedPeriod} />
+                    <button onClick={loadData}
+                            className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                        <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? "animate-spin text-blue-500" : "text-gray-400"}`} />
+                        Actualiser
+                    </button>
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] text-emerald-700 font-semibold uppercase tracking-wide">Live</span>
                     </div>
                 </div>
             </div>
 
-            {/* Indicateur de mise à jour */}
             {isUpdating && (
-                <div className="fixed top-4 right-4 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 shadow-sm animate-fade-in">
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
-                        <span className="text-xs text-blue-700">Mise à jour...</span>
-                    </div>
+                <div className="fixed top-4 right-4 bg-white border border-blue-100 rounded-xl px-3.5 py-2 shadow-md z-50 flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                    <span className="text-xs font-medium text-blue-600">Actualisation…</span>
                 </div>
             )}
 
-            {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                <KpiCard
-                    label="Recettes"
-                    value={`${formatCompactCurrency(currentEntrees)} F`}
-                    sub={`Total: ${formatCompactCurrency(totalEntrees)} F`}
-                    subPositive={currentEntrees > 0}
-                    icon={TrendingUp}
-                    color="green"
-                    delay={0}
-                />
-                <KpiCard
-                    label="Dépenses"
-                    value={`${formatCompactCurrency(currentSorties)} F`}
-                    sub={`Total: ${formatCompactCurrency(totalSorties)} F`}
-                    subPositive={false}
-                    icon={CreditCard}
-                    color="red"
-                    delay={100}
-                />
-                <KpiCard
-                    label="Solde Caisse"
-                    value={`${formatCompactCurrency(currentSolde)} F`}
-                    sub={currentSolde >= 0 ? "Positif" : "Négatif"}
-                    subPositive={currentSolde >= 0}
-                    icon={Wallet}
-                    color={currentSolde >= 0 ? "green" : "red"}
-                    delay={200}
-                />
-                <KpiCard
-                    label="Saisies Jour"
-                    value={formatNumberValue(stats.today)}
-                    sub={`${formatNumberValue(stats.thisWeek)} cette semaine`}
-                    subPositive={stats.today > 0}
-                    icon={FileText}
-                    color="purple"
-                    delay={300}
-                />
-            </div>
+            {/* ── 01 KPIs ── */}
+            <SectionHeader number="01" title="Indicateurs de la période" />
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
-                {/* Cash Flow */}
-                <div className={`lg:col-span-3 bg-white rounded-xl shadow-sm border p-5 animate-slide-up transition-opacity duration-300 ${
-                    isUpdating ? 'opacity-50' : 'opacity-100'
-                }`} style={{ animationDelay: '400ms' }}>
-                    <div className="flex items-start justify-between mb-4">
-                        <div>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">
-                                Flux de Trésorerie - {PERIOD_LABELS[selectedPeriod]}
+            {/* Hero CA + petites cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+
+                {/* Hero card CA */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-7 flex flex-col justify-between relative overflow-hidden animate-slide-up" style={{ minHeight: 220 }}>
+                    <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl bg-emerald-500" />
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                                Chiffre d'affaires · {PERIOD_LABELS[selectedPeriod]}
                             </p>
-                            <h2 className="text-base font-bold text-gray-900">Recettes vs Dépenses</h2>
+                            <div className="p-2 bg-emerald-50 rounded-xl"><TrendingUp className="w-4 h-4 text-emerald-600" /></div>
                         </div>
-                        <div className="flex gap-3">
-                            <LegendDot color="#16a34a" label="Recettes" />
-                            <LegendDot color="#ef4444" label="Dépenses" />
+                        <p className="text-5xl font-bold text-gray-900 tabular-nums tracking-tight mt-3 mb-2">
+                            {formatMoneyFCFA(current.ca ?? 0)}
+                        </p>
+                        <p className="text-sm text-gray-400 font-medium">
+                            Cumul période : <span className="text-gray-700 font-semibold">{formatMoneyFCFA(totalCA)}</span>
+                        </p>
+                    </div>
+                    <div className="flex items-end justify-between mt-6 pt-5 border-t border-gray-50 flex-wrap gap-3">
+                        <div>
+                            {caTrend !== 0 && (
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    {caTrend > 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
+                                    <span className={`text-sm font-bold tabular-nums ${caTrend > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                        {caTrend > 0 ? "+" : ""}{caTrend}%
+                                    </span>
+                                    <span className="text-xs text-gray-400">vs période préc.</span>
+                                </div>
+                            )}
+                            <p className="text-[11px] text-gray-400">
+                                Marge brute : <span className={`font-semibold ${margeBrute >= 0 ? "text-emerald-600" : "text-red-500"}`}>{formatMoneyFCFA(margeBrute)}</span>
+                                <span className="mx-2 text-gray-200">·</span>
+                                Taux : <span className="font-semibold text-gray-700">{tauxMarge.toFixed(1)}%</span>
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Panier moyen</p>
+                            <p className="text-xl font-bold text-gray-900 tabular-nums">{formatMoneyFCFA(panierGlobal)}</p>
                         </div>
                     </div>
+                </div>
 
-                    <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={cashFlowData} barGap={4} barCategoryGap="20%">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                            <XAxis
-                                dataKey="periode"
-                                tick={{ fontSize: 10, fill: "#9ca3af" }}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis
-                                tick={{ fontSize: 10, fill: "#9ca3af" }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `${Math.round(v / 1000)}K`}
-                            />
-                            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9fafb" }} />
-                            <Bar dataKey="entrees" fill="#16a34a" radius={[4, 4, 0, 0]} name="Recettes" />
-                            <Bar dataKey="sorties" fill="#ef4444" radius={[4, 4, 0, 0]} name="Dépenses" />
+                {/* 4 petites cards */}
+                <div className="flex flex-col gap-4">
+                    {[
+                        { label: "Commandes", value: formatNumberValue(current.commandes ?? 0), sub: `Total période : ${formatNumberValue(totalCmds)}`, trend: cmdTrend, bar: "bg-blue-500", iconBg: "bg-blue-50", icon: <ShoppingCart className="w-3.5 h-3.5 text-blue-600" /> },
+                        { label: "Panier moyen", value: fmt(current.panierMoyen ?? 0), sub: `Global : ${fmt(panierGlobal)}`, bar: "bg-purple-500", iconBg: "bg-purple-50", icon: <Calculator className="w-3.5 h-3.5 text-purple-600" /> },
+                        { label: "Solde caisse", value: fmt(current.solde ?? 0), sub: `Variation : ${fmt(Math.abs((current.entrees ?? 0) - (current.sorties ?? 0)))}`, bar: (current.solde ?? 0) >= 0 ? "bg-cyan-500" : "bg-red-500", iconBg: (current.solde ?? 0) >= 0 ? "bg-cyan-50" : "bg-red-50", icon: <Wallet className={`w-3.5 h-3.5 ${(current.solde ?? 0) >= 0 ? "text-cyan-600" : "text-red-500"}`} />, subPositive: (current.entrees ?? 0) >= (current.sorties ?? 0) },
+                        { label: "Flux cumulés", value: null, bar: "bg-amber-400", iconBg: "bg-amber-50", icon: null, custom: (
+                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                    <div className="bg-emerald-50 rounded-xl p-2 text-center">
+                                        <p className="text-[9px] font-semibold text-emerald-600 uppercase mb-0.5">Entrées</p>
+                                        <p className="text-xs font-bold text-emerald-700 tabular-nums">{fmt(totalEntrees)}</p>
+                                    </div>
+                                    <div className="bg-red-50 rounded-xl p-2 text-center">
+                                        <p className="text-[9px] font-semibold text-red-500 uppercase mb-0.5">Sorties</p>
+                                        <p className="text-xs font-bold text-red-600 tabular-nums">{fmt(totalSorties)}</p>
+                                    </div>
+                                </div>
+                            )},
+                    ].map(({ label, value, sub, trend: t, bar, iconBg, icon, custom, subPositive }, i) => (
+                        <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 relative overflow-hidden animate-slide-up" style={{ animationDelay: `${(i + 1) * 80}ms` }}>
+                            <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl ${bar}`} />
+                            <div className="flex items-center justify-between mb-2 mt-0.5">
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
+                                {icon && <div className={`p-1.5 ${iconBg} rounded-lg`}>{icon}</div>}
+                            </div>
+                            {value !== null && (
+                                <p className="text-2xl font-bold text-gray-900 tabular-nums tracking-tight">{value}</p>
+                            )}
+                            {sub && (
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <p className={`text-[11px] font-medium ${subPositive === false ? "text-red-500" : "text-gray-400"}`}>{sub}</p>
+                                    {t !== undefined && t !== 0 && (
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${t > 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
+                                            {t > 0 ? "+" : ""}{t}%
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            {custom}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── 02 FLUX TRÉSORERIE ── */}
+            <SectionHeader number="02" title="Flux de trésorerie" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+
+                {/* Entrées vs Sorties — bar chart */}
+                <ChartCard title="Entrées vs Sorties" sub="Comparaison par période" className="lg:col-span-2">
+                    <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={fluxData} barGap={3} barCategoryGap="28%">
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                            <XAxis dataKey="periode" tick={axisTick} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={fmt} tick={axisTick} axisLine={false} tickLine={false} />
+                            <Tooltip content={<CustomTooltip fmt={(v) => formatMoneyFCFA(v)} />} />
+                            <Legend wrapperStyle={{ fontSize: 11, color: "#9ca3af" }} />
+                            <Bar dataKey="Entrées" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Sorties" fill="#f87171" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
-                </div>
+                </ChartCard>
 
-                {/* Balance */}
-                <div className={`lg:col-span-2 bg-white rounded-xl shadow-sm border p-5 animate-slide-up transition-opacity duration-300 ${
-                    isUpdating ? 'opacity-50' : 'opacity-100'
-                }`} style={{ animationDelay: '500ms' }}>
-                    <div className="mb-4">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">
-                            Évolution - {PERIOD_LABELS[selectedPeriod]}
-                        </p>
-                        <h2 className="text-base font-bold text-gray-900">Solde Caisse</h2>
+                {/* Donut Entrées/Sorties */}
+                <ChartCard title="Répartition flux" sub={`${PERIOD_LABELS[selectedPeriod]} — cumul`}>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <RePieChart>
+                            <Pie data={donutFlux} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
+                                 paddingAngle={4} dataKey="value"
+                                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                 labelLine={{ stroke: "#d1d5db", strokeWidth: 1 }}>
+                                <Cell fill="#22c55e" />
+                                <Cell fill="#f87171" />
+                            </Pie>
+                            <Tooltip formatter={(v) => formatMoneyFCFA(v)} />
+                        </RePieChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div className="text-center">
+                            <p className="text-[9px] font-semibold text-emerald-600 uppercase mb-0.5">Entrées</p>
+                            <p className="text-sm font-bold text-emerald-700 tabular-nums">{fmt(totalEntrees)}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] font-semibold text-red-500 uppercase mb-0.5">Sorties</p>
+                            <p className="text-sm font-bold text-red-600 tabular-nums">{fmt(totalSorties)}</p>
+                        </div>
                     </div>
+                </ChartCard>
+            </div>
 
-                    <ResponsiveContainer width="100%" height={220}>
-                        <AreaChart data={balanceData}>
+            {/* ── 03 ÉVOLUTION & TENDANCES ── */}
+            <SectionHeader number="03" title="Évolution & tendances" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+
+                {/* CA + Marge — dual line */}
+                <ChartCard title="CA vs Marge brute" sub="Évolution comparée sur la période">
+                    <ResponsiveContainer width="100%" height={240}>
+                        <LineChart data={evolutionData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                            <XAxis dataKey="periode" tick={axisTick} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={fmt} tick={axisTick} axisLine={false} tickLine={false} />
+                            <Tooltip content={<CustomTooltip fmt={(v) => formatMoneyFCFA(v)} />} />
+                            <Legend wrapperStyle={{ fontSize: 11, color: "#9ca3af" }} />
+                            <Line type="monotone" dataKey="CA" stroke="#3b82f6" strokeWidth={2.5}
+                                  dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
+                            <Line type="monotone" dataKey="Marge" stroke="#10b981" strokeWidth={2}
+                                  strokeDasharray="5 3"
+                                  dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Solde cumulé — area */}
+                <ChartCard title="Solde de trésorerie cumulé" sub="Accumulation nette des flux">
+                    <ResponsiveContainer width="100%" height={240}>
+                        <AreaChart data={soldeData}>
                             <defs>
                                 <linearGradient id="soldeGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                                    <stop offset="0%"   stopColor="#06b6d4" stopOpacity={0.2} />
+                                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0}   />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                            <XAxis
-                                dataKey="periode"
-                                tick={{ fontSize: 10, fill: "#9ca3af" }}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis
-                                tick={{ fontSize: 10, fill: "#9ca3af" }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `${Math.round(v / 1000)}K`}
-                            />
-                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#e5e7eb" }} />
-                            <Area
-                                type="monotone"
-                                dataKey="solde"
-                                stroke="#2563eb"
-                                strokeWidth={2}
-                                fill="url(#soldeGrad)"
-                                name="Solde"
-                                dot={{ fill: "#2563eb", r: 2 }}
-                                activeDot={{ r: 4 }}
-                            />
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                            <XAxis dataKey="periode" tick={axisTick} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={fmt} tick={axisTick} axisLine={false} tickLine={false} />
+                            <Tooltip content={<CustomTooltip fmt={(v) => formatMoneyFCFA(v)} />} />
+                            <Area type="monotone" dataKey="Solde" stroke="#06b6d4" strokeWidth={2.5}
+                                  fill="url(#soldeGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                         </AreaChart>
                     </ResponsiveContainer>
-                </div>
-            </div>
+                </ChartCard>
 
-            {/* Reports */}
-            <div className="bg-white rounded-xl shadow-sm border p-5 animate-slide-up" style={{ animationDelay: '600ms' }}>
-                <div className="mb-4">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Suivi</p>
-                    <h2 className="text-base font-bold text-gray-900">Rapports Comptables</h2>
-                </div>
+                {/* Panier moyen — line */}
+                <ChartCard title="Évolution du panier moyen" sub="Valeur moyenne par commande">
+                    <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={panierData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                            <XAxis dataKey="periode" tick={axisTick} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={fmt} tick={axisTick} axisLine={false} tickLine={false} />
+                            <Tooltip content={<CustomTooltip fmt={(v) => formatMoneyFCFA(v)} />} />
+                            <Line type="monotone" dataKey="Panier moyen" stroke="#8b5cf6" strokeWidth={2.5}
+                                  dot={{ r: 3.5, fill: "#8b5cf6", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </ChartCard>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <StatPill label="Total" value={formatNumberValue(reportStats.total)} color="gray" icon={FileText} />
-                    <StatPill label="Validées" value={formatNumberValue(reportStats.validated)} color="green" icon={CheckCircle2} />
-                    <StatPill label="Attente" value={formatNumberValue(reportStats.pending)} color="amber" icon={Clock} />
-                    <StatPill label="Rejetées" value={formatNumberValue(reportStats.rejected)} color="red" icon={AlertCircle} />
-                </div>
-
-                {/* Progress Bars */}
-                <div className="space-y-3">
-                    <div className="bg-gray-50 rounded-lg px-4 py-3">
-                        <div className="flex justify-between mb-2">
-                            <span className="text-[10px] text-gray-500">Validation</span>
-                            <span className="text-[10px] text-green-600 font-semibold tabular-nums">{validationRate}%</span>
+                {/* Donut CA par période */}
+                <ChartCard title="Répartition du CA par période" sub={`Dernières ${donutCA.length} périodes`}>
+                    <div className="flex items-center gap-4">
+                        <div className="flex-shrink-0">
+                            <ResponsiveContainer width={180} height={180}>
+                                <RePieChart>
+                                    <Pie data={donutCA} cx="50%" cy="50%" innerRadius={48} outerRadius={80}
+                                         paddingAngle={3} dataKey="value" label={false}>
+                                        {donutCA.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                    </Pie>
+                                    <Tooltip formatter={(v) => formatMoneyFCFA(v)} />
+                                </RePieChart>
+                            </ResponsiveContainer>
                         </div>
-                        <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-1000" style={{ width: `${validationRate}%` }} />
+                        <div className="flex flex-col gap-2 flex-1">
+                            {donutCA.map((item, i) => {
+                                const pct = totalCA > 0 ? ((item.value / totalCA) * 100).toFixed(1) : 0;
+                                return (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                                        <span className="text-[11px] text-gray-500 flex-1 truncate">{item.name}</span>
+                                        <span className="text-[11px] font-semibold text-gray-700 tabular-nums">{pct}%</span>
+                                        <span className="text-[10px] text-gray-400 tabular-nums">{fmt(item.value)}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
-
-                    <div className="bg-gray-50 rounded-lg px-4 py-3">
-                        <div className="flex justify-between mb-2">
-                            <span className="text-[10px] text-gray-500">Activité</span>
-                            <span className="text-[10px] text-blue-600 font-semibold tabular-nums">{activityPct}%</span>
+                    {/* Indicateurs clés en bas */}
+                    <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-50">
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">Taux marge</p>
+                            <p className="text-sm font-bold text-gray-900 tabular-nums">{tauxMarge.toFixed(1)}%</p>
+                            <div className="w-full bg-gray-100 rounded-full h-1 mt-1">
+                                <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${Math.min(100, tauxMarge)}%` }} />
+                            </div>
                         </div>
-                        <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-1000" style={{ width: `${activityPct}%` }} />
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">Marge brute</p>
+                            <p className={`text-sm font-bold tabular-nums ${margeBrute >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                {fmt(margeBrute)}
+                            </p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">Conv. CA→Entrées</p>
+                            <p className="text-sm font-bold text-gray-900 tabular-nums">
+                                {totalCA > 0 ? ((totalEntrees / totalCA) * 100).toFixed(1) : 0}%
+                            </p>
                         </div>
                     </div>
-                </div>
+                </ChartCard>
             </div>
 
-            {/* CSS Animations */}
             <style>{`
                 @keyframes slide-up {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
+                    from { opacity: 0; transform: translateY(10px); }
+                    to   { opacity: 1; transform: translateY(0); }
                 }
-
-                @keyframes fade-in {
-                    from {
-                        opacity: 0;
-                    }
-                    to {
-                        opacity: 1;
-                    }
-                }
-
-                .animate-slide-up {
-                    animation: slide-up 0.6s ease-out forwards;
-                }
-
-                .animate-fade-in {
-                    animation: fade-in 0.4s ease-out;
-                }
-
-                .tabular-nums {
-                    font-variant-numeric: tabular-nums;
-                }
+                .animate-slide-up { animation: slide-up 0.35s ease-out forwards; opacity: 0; }
+                .tabular-nums     { font-variant-numeric: tabular-nums; }
             `}</style>
         </div>
     );
