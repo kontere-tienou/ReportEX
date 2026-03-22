@@ -16,6 +16,7 @@ import {
     formatCellValue, formatDateValue, formatMoneyFCFA,
     formatNumberValue,
 } from "../reports/builder/utils/tableFormaterUtils.js";
+import {getDepartmentById} from "../../../config/departments.js";
 
 export default function Data() {
     const { user }    = useAuth();
@@ -41,6 +42,7 @@ export default function Data() {
     const [calMonth,  setCalMonth]  = useState(new Date().getMonth());
     const [sortField, setSortField] = useState('date');
     const [sortDir,   setSortDir]   = useState('desc');
+    const departmentId = user?.department?.id ?? user?.department_id;
 
     // Helpers calendrier
     const toYMD = (d) => d.toISOString().split('T')[0];
@@ -189,6 +191,8 @@ export default function Data() {
     const hasFilters = search || dateFrom;
     const clearFilters = () => { setSearch(''); setDateFrom(''); setDateTo(''); setHoverDay(null); };
 
+    const department = getDepartmentById(Number(departmentId));
+
     /* ── Colonnes ── */
     const columns = schema ? [
         {
@@ -239,7 +243,12 @@ export default function Data() {
                 <p className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-5">{error}</p>
                 <div className="flex gap-3">
                     <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700">
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5  text-white rounded-xl text-sm font-medium "
+                            style={{
+                                backgroundColor: department.color,
+                                borderBottomColor: department.color,
+                            }}
+                    >
                         <RefreshCw className="w-3.5 h-3.5" /> Réessayer
                     </button>
                     <button onClick={() => navigate(-1)}
@@ -253,8 +262,10 @@ export default function Data() {
 
     if (schemaLoading) return (
         <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-[3px] border-cyan-100 border-t-cyan-500 animate-spin" />
-            <p className="text-sm text-gray-400">Chargement…</p>
+            <div  className="w-10 h-10 rounded-full border-[3px] border-cyan-100 animate-spin" />
+            <p className="text-sm text-gray-400"
+               style={{ color: department.color }}
+            >Chargement…</p>
         </div>
     );
 
@@ -267,7 +278,9 @@ export default function Data() {
                 <h3 className="text-base font-semibold text-gray-900 mb-2">Schéma introuvable</h3>
                 <p className="text-xs text-gray-400 mb-5">Code : {deptCode}</p>
                 <button onClick={() => { setError(null); setSchemaLoading(true); loadSchema(); }}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-medium hover:bg-cyan-700">
+                        className="inline-flex items-center gap-2 px-5 py-2.5  text-white rounded-xl text-sm font-medium hover:bg-cyan-700
+
+                        " style={{ color: department.color }}>
                     <RefreshCw className="w-3.5 h-3.5" /> Réessayer
                 </button>
             </div>
@@ -282,7 +295,9 @@ export default function Data() {
             {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
-                    <p className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest mb-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                       style={{ color: department.color }}
+                    >
                         {schema.icon} Saisie de données
                     </p>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -294,7 +309,12 @@ export default function Data() {
                     </p>
                 </div>
                 <button onClick={handleCreate}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-700 transition-colors shadow-sm flex-shrink-0">
+                        className="inline-flex items-center gap-2 px-5 py-2.5  text-white rounded-xl text-sm font-semibold  transition-colors shadow-sm flex-shrink-0"
+                        style={{
+                            backgroundColor: department.color,
+                            borderBottomColor: department.color,
+                        }}
+                >
                     <Plus className="w-4 h-4" /> Nouvelle saisie
                 </button>
             </div>
@@ -310,7 +330,7 @@ export default function Data() {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Rechercher…"
-                        className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none w-40 transition-all focus:w-56"
+                        className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2  focus:border-transparent outline-none w-40 transition-all focus:w-56"
                     />
                 </div>
 
@@ -325,7 +345,9 @@ export default function Data() {
                             dateFrom
                                 ? 'border-cyan-300 bg-cyan-50 text-cyan-700 font-semibold'
                                 : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}>
+                        }`
+
+                    }>
                         <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                         {calLabel()}
                         {dateFrom && (
@@ -473,7 +495,12 @@ export default function Data() {
                         </p>
                         {!hasFilters && (
                             <button onClick={handleCreate}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-700">
+                                    className="inline-flex items-center gap-2 px-5 py-2.5  text-white rounded-xl text-sm font-semibold "
+                                    style={{
+                                        backgroundColor: department.color,
+                                        borderBottomColor: department.color,
+                                    }}
+                            >
                                 <Plus className="w-4 h-4" /> Nouvelle saisie
                             </button>
                         )}

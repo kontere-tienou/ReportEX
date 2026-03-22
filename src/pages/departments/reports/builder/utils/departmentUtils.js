@@ -48,7 +48,7 @@ export const validateDepartmentCode = async (deptCode) => {
         // You can add a validation endpoint or check against known codes
         const validCodes = [
             'IMPRESSION', 'CONFECTION', 'TEINTURE', 'PRODUCTION',
-            'IT', 'RH', 'ACHATS', 'BUREAU_ETUDE', 'COMMERCIAL',
+            'INFORMATIQUE', 'RH', 'ACHATS', 'BUREAU_ETUDE', 'COMMERCIAL',
             'COMPTABILITE', 'DG'
         ];
         return validCodes.includes(deptCode);

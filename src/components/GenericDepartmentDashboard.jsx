@@ -17,10 +17,9 @@ const GenericDepartmentDashboard = ({
 
     useEffect(() => {
         loadDashboardData();
-    }, [user?.department_id]); // ✅ FIX: Add dependency
+    }, [user?.department_id]);
 
     const loadDashboardData = async () => {
-        // ✅ FIX: Check if user and department_id exist
         if (!user?.department_id) {
             console.warn('No department_id found for user:', user);
             setLoading(false);
@@ -28,14 +27,12 @@ const GenericDepartmentDashboard = ({
         }
 
         try {
-            // ✅ FIX: Pass department_id explicitly
             const statsRes = await reportService.getDepartmentStats(user.department_id);
             const statsData = statsRes.data?.stats || statsRes.data?.data?.stats || {};
 
             setStats(statsData);
         } catch (error) {
             console.error('Erreur chargement dashboard:', error);
-            // ✅ FIX: Set empty stats on error
             setStats({
                 total_reports: 0,
                 validated_reports: 0,
@@ -58,7 +55,7 @@ const GenericDepartmentDashboard = ({
         );
     }
 
-    // ✅ FIX: Handle missing stats
+
     if (!stats) {
         return (
             <div className="flex items-center justify-center h-screen">

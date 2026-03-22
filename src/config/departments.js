@@ -48,11 +48,6 @@ import {
     Book
 } from "lucide-react";
 
-
-// =======================================================
-// DEPARTMENTS CONFIG
-// =======================================================
-
 export const DEPARTMENTS = {
 
     DIR: {
@@ -220,10 +215,6 @@ export const DEPARTMENTS = {
 };
 
 
-// =======================================================
-// HELPERS
-// =======================================================
-
 export const getDepartmentById = (id) => {
     return Object.values(DEPARTMENTS).find(dept => dept.id === id);
 };
@@ -236,28 +227,16 @@ export const getDepartmentByColor = (color) => {
     return Object.values(DEPARTMENTS).find(dept => dept.color === color);
 };
 
-
-
-// =======================================================
-// BASE MENU
-// =======================================================
-
 const baseItems = [
-    { name: 'Tableau de bord', href: 'dashboard', icon: LayoutDashboard },
-    { name: 'Vue d\'ensemble', href: 'overview', icon: Eye },
-    { name: 'Activité récente', href: 'activity', icon: Activity },
-    { name: 'Alertes', href: 'alerts', icon: AlertTriangle }
+    { name: 'Tableau de bord', href: 'dashboard', icon: LayoutDashboard }
 ];
-
-
-
-// =======================================================
-// DEPARTMENT MENUS
-// =======================================================
-
 const departmentSpecificItems = {
 
     1: [
+
+        { name: 'Vue d\'ensemble', href: 'overview', icon: Eye },
+        { name: 'Activité récente', href: 'activity', icon: Activity },
+        { name: 'Alertes', href: 'alerts', icon: AlertTriangle },
         { name: 'KPIs Usine', href: 'kpis', icon: TrendingUp },
         { name: 'Validations', href: 'approvals', icon: CheckCircle },
         { name: 'Rapports Consolidés', href: 'reports', icon: FileText },
@@ -268,7 +247,7 @@ const departmentSpecificItems = {
         { name: 'Journaux Comptables', href: 'journals', icon: BookOpen },
         { name: 'Budgets', href: 'budgets', icon: PieChart },
         { name: 'Rapprochements', href: 'reconciliation', icon: RefreshCw },
-        { name: 'Mes Rapports', href: 'reports', icon: 'FileText' },
+        { name: 'Mes Rapports', href: 'reports', icon: Printer },
         { name: 'Données', href: 'data', icon: 'data' },
         { name: 'Factures Clients', href: 'customer-invoices', icon: Receipt }
     ],
@@ -345,11 +324,6 @@ const departmentSpecificItems = {
 
 };
 
-
-
-// =======================================================
-// MENU BUILDER
-// =======================================================
 
 export const getDepartmentMenuItems = (departmentId) => {
 
