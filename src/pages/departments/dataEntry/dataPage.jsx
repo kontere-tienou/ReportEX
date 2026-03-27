@@ -262,10 +262,13 @@ export default function Data() {
 
     if (schemaLoading) return (
         <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
-            <div  className="w-10 h-10 rounded-full border-[3px] border-cyan-100 animate-spin" />
-            <p className="text-sm text-gray-400"
-               style={{ color: department.color }}
-            >Chargement…</p>
+            <div
+                className="w-10 h-10 rounded-full border-[3px] border-blue-100 animate-spin"
+                style={{ borderTopColor: department?.color || "#3b82f6" }}
+            />
+            <p className="text-sm text-gray-400" style={{ color: department?.color || "#6b7280" }}>
+                Chargement…
+            </p>
         </div>
     );
 

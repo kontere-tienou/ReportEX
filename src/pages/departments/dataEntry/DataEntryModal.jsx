@@ -3,10 +3,12 @@ import { X, Save, Database, Calendar, Hash, Type, AlignLeft, DollarSign } from '
 import { dataService } from '../../../services/dataService.js';
 import { useToast } from '../../../components/ui/Toast';
 import { formatMoneyFCFA, formatNumberValue } from '../reports/builder/utils/tableFormaterUtils.js';
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { getDepartmentById } from "../../../config/departments.js";
 
-// Colonnes monétaires — doit correspondre à formatCellValue dans tableFormaterUtils
+// Colonnes monétaires
 const MONEY_COLS = [
-    'ca', 'caisse_entrees', 'caisse_sorties', 'solde_caisse',
+    'ca', 'caisse_entrees', 'caisse_sorties',
     'montant', 'total', 'prix', 'cout', 'budget',
 ];
 
@@ -16,17 +18,12 @@ const isMoney = (key) =>
     (key || '').toLowerCase().includes('caisse') ||
     (key || '').toLowerCase().includes('solde');
 
-/**
- * Input numérique intelligent :
- * - En focus  → valeur brute éditable (ex: "20000000")
- * - Hors focus → valeur formattée (ex: "20.000.000,00 FCFA" ou "20 000")
- */
-function SmartNumberInput({ fieldKey, value, onChange, onBlur, min, max, step, placeholder, hasError, unit }) {
+function SmartNumberInput({ fieldKey, value, onChange, onBlur, min, max, step, placeholder, hasError, unit, deptColor }) {
     const [focused, setFocused] = useState(false);
     const money = isMoney(fieldKey);
 
     const displayValue = () => {
-        if (focused) return value; // brut pendant l'édition
+        if (focused) return value;
         if (value === '' || value === null || value === undefined) return '';
         const n = Number(value);
         if (isNaN(n)) return value;
@@ -39,16 +36,25 @@ function SmartNumberInput({ fieldKey, value, onChange, onBlur, min, max, step, p
                 type={focused ? 'number' : 'text'}
                 value={displayValue()}
                 onChange={e => onChange(e.target.value)}
-                onFocus={() => setFocused(true)}
                 onBlur={() => { setFocused(false); onBlur?.(); }}
-                min={min} max={max}
+                min={min}
+                max={max}
                 step={step || 'any'}
                 placeholder={placeholder || (money ? '0' : '0')}
-                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 tabular-nums ${
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 tabular-nums ${
                     hasError ? 'border-red-300 bg-red-50' : 'border-gray-200'
                 } ${money && !focused ? 'font-medium text-gray-700' : ''}`}
+                style={{
+                    ...(hasError ? {} : { '--tw-ring-color': deptColor }),
+                    ...(hasError ? {} : { focusRingColor: deptColor })
+                }}
+                onFocus={(e) => {
+                    setFocused(true);
+                    if (!hasError) {
+                        e.target.style.setProperty('--tw-ring-color', deptColor, 'important');
+                    }
+                }}
             />
-            {/* Badge type à droite quand hors focus */}
             {!focused && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-gray-300 pointer-events-none select-none">
                     {unit || (money ? 'FCFA' : '#')}
@@ -62,16 +68,24 @@ export default function DataEntryModal({
                                            isOpen, onClose, onSuccess,
                                            editingData = null, schema, deptCode, departmentName
                                        }) {
+    const { user } = useAuth();
     const { addToast } = useToast();
-    const [formData,    setFormData]    = useState({});
-    const [machinesData,setMachinesData]= useState({});
-    const [loading,     setLoading]     = useState(false);
-    const [touched,     setTouched]     = useState({});
+    const [formData, setFormData] = useState({});
+    const [machinesData, setMachinesData] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [touched, setTouched] = useState({});
     const firstInputRef = useRef(null);
     const isEdit = !!editingData;
 
+    const departmentId = user?.department?.id ?? user?.department_id;
+    const department = getDepartmentById(Number(departmentId));
+    const deptColor = department.color || '#06d466';
+
     useEffect(() => {
-        if (!isOpen || !schema) { document.body.style.overflow = 'unset'; return; }
+        if (!isOpen || !schema) {
+            document.body.style.overflow = 'unset';
+            return;
+        }
         document.body.style.overflow = 'hidden';
 
         if (editingData) {
@@ -88,9 +102,9 @@ export default function DataEntryModal({
         } else {
             const init = {};
             schema.fields.forEach(f => {
-                if      (f.type === 'date')                    init[f.key] = new Date().toISOString().split('T')[0];
+                if (f.type === 'date') init[f.key] = new Date().toISOString().split('T')[0];
                 else if (f.type === 'select' && f.defaultValue) init[f.key] = f.defaultValue;
-                else                                            init[f.key] = '';
+                else init[f.key] = '';
             });
             setFormData(init);
             if (schema.machines?.length) {
@@ -124,12 +138,10 @@ export default function DataEntryModal({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // Touch all required fields
         const allTouched = {};
         schema.fields.forEach(f => { allTouched[f.key] = true; });
         setTouched(allTouched);
 
-        // Validate
         for (const field of schema.fields.filter(f => f.required)) {
             const v = formData[field.key];
             if (v === '' || v === null || v === undefined) {
@@ -165,9 +177,9 @@ export default function DataEntryModal({
 
     const getFieldIcon = (field) => {
         const cls = "w-3.5 h-3.5";
-        if (field.type === 'date')     return <Calendar  className={cls} />;
+        if (field.type === 'date') return <Calendar className={cls} />;
         if (field.type === 'textarea') return <AlignLeft className={cls} />;
-        if (field.type === 'number')   return isMoney(field.key)
+        if (field.type === 'number') return isMoney(field.key)
             ? <DollarSign className={cls} />
             : <Hash className={cls} />;
         return <Type className={cls} />;
@@ -175,15 +187,14 @@ export default function DataEntryModal({
 
     if (!isOpen || !schema) return null;
 
-    // Séparer les champs : date en premier, puis les autres
-    const dateFields   = schema.fields.filter(f => f.type === 'date');
-    const regularFields= schema.fields.filter(f => f.type !== 'date' && f.type !== 'textarea');
+    const dateFields = schema.fields.filter(f => f.type === 'date');
+    const regularFields = schema.fields.filter(f => f.type !== 'date' && f.type !== 'textarea');
     const textareaFields = schema.fields.filter(f => f.type === 'textarea');
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(15,18,25,0.55)', backdropFilter: 'blur(4px)' }}
+            style={{ background: `rgba(${parseInt(deptColor.slice(1,3), 16)}, ${parseInt(deptColor.slice(3,5), 16)}, ${parseInt(deptColor.slice(5,7), 16)}, 0.55)`, backdropFilter: 'blur(4px)' }}
             onClick={e => e.target === e.currentTarget && onClose()}
         >
             <div
@@ -191,11 +202,14 @@ export default function DataEntryModal({
                 style={{ maxWidth: 680, maxHeight: '92vh', boxShadow: '0 32px 80px rgba(0,0,0,0.18)' }}
                 onClick={e => e.stopPropagation()}
             >
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-gray-100 flex-shrink-0">
+                {/* ── Header avec bordure colorée ── */}
+                <div
+                    className="flex items-center justify-between px-6 pt-6 pb-5 border-b flex-shrink-0"
+                    style={{ borderBottomColor: `${deptColor}20` }}
+                >
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-[10px] font-semibold text-cyan-500 uppercase tracking-widest">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: deptColor }}>
                                 {schema.icon} {departmentName}
                             </span>
                         </div>
@@ -227,7 +241,9 @@ export default function DataEntryModal({
                                     type="date"
                                     value={(formData[field.key] || '').slice(0, 10)}
                                     onChange={e => handleChange(field.key, e.target.value)}
-                                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all text-gray-800 font-medium bg-gray-50 focus:bg-white"
+                                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent outline-none transition-all text-gray-800 font-medium bg-gray-50 focus:bg-white"
+                                    style={{ '--tw-ring-color': deptColor }}
+                                    onFocus={(e) => e.target.style.setProperty('--tw-ring-color', deptColor, 'important')}
                                 />
                                 {getError(field) && (
                                     <p className="text-[11px] text-red-500 mt-1">{getError(field)}</p>
@@ -252,7 +268,12 @@ export default function DataEntryModal({
                                                 <select
                                                     value={formData[field.key] || ''}
                                                     onChange={e => handleChange(field.key, e.target.value)}
-                                                    className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 ${err ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                                                    className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 ${
+                                                        err ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                                    }`}
+                                                    style={{ '--tw-ring-color': deptColor }}
+                                                    onFocus={(e) => e.target.style.setProperty('--tw-ring-color', deptColor, 'important')}
+                                                >
                                                     <option value="">Sélectionner…</option>
                                                     {field.options?.map(opt => (
                                                         <option key={opt} value={opt}>{opt}</option>
@@ -270,6 +291,7 @@ export default function DataEntryModal({
                                                     placeholder={field.placeholder}
                                                     hasError={!!err}
                                                     unit={field.unit}
+                                                    deptColor={deptColor}
                                                 />
                                             ) : (
                                                 <input
@@ -279,7 +301,11 @@ export default function DataEntryModal({
                                                     onChange={e => handleChange(field.key, e.target.value)}
                                                     onBlur={() => setTouched(p => ({ ...p, [field.key]: true }))}
                                                     placeholder={field.placeholder || ''}
-                                                    className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 ${err ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                                                    className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:ring-2 focus:border-transparent outline-none transition-all bg-gray-50 focus:bg-white text-gray-800 ${
+                                                        err ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                                    }`}
+                                                    style={{ '--tw-ring-color': deptColor }}
+                                                    onFocus={(e) => e.target.style.setProperty('--tw-ring-color', deptColor, 'important')}
                                                 />
                                             )}
 
@@ -307,7 +333,9 @@ export default function DataEntryModal({
                                     onChange={e => handleChange(field.key, e.target.value)}
                                     rows={field.rows || 3}
                                     placeholder={field.placeholder || `Observations, notes…`}
-                                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none resize-none transition-all bg-gray-50 focus:bg-white text-gray-800"
+                                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent outline-none resize-none transition-all bg-gray-50 focus:bg-white text-gray-800"
+                                    style={{ '--tw-ring-color': deptColor }}
+                                    onFocus={(e) => e.target.style.setProperty('--tw-ring-color', deptColor, 'important')}
                                 />
                                 {field.help && <p className="text-[11px] text-gray-400 mt-1">{field.help}</p>}
                             </div>
@@ -317,8 +345,10 @@ export default function DataEntryModal({
                         {schema.machines?.length > 0 && (
                             <div className="mt-2 pt-5 border-t border-gray-100">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <Database className="w-3.5 h-3.5 text-gray-400" />
-                                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">État des machines</span>
+                                    <Database className="w-3.5 h-3.5" style={{ color: deptColor }} />
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: deptColor }}>
+                                        État des machines
+                                    </span>
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {schema.machines.map(machine => (
@@ -329,7 +359,9 @@ export default function DataEntryModal({
                                                 value={machinesData[machine.key] || ''}
                                                 onChange={e => setMachinesData(p => ({ ...p, [machine.key]: e.target.value }))}
                                                 min="0" step="0.01" placeholder="0.00"
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-gray-50 focus:bg-white tabular-nums"
+                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent outline-none bg-gray-50 focus:bg-white tabular-nums"
+                                                style={{ '--tw-ring-color': deptColor }}
+                                                onFocus={(e) => e.target.style.setProperty('--tw-ring-color', deptColor, 'important')}
                                             />
                                         </div>
                                     ))}
@@ -339,7 +371,7 @@ export default function DataEntryModal({
                     </form>
                 </div>
 
-                {/* ── Footer ── */}
+                {/* ── Footer avec bouton coloré ── */}
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
                     <p className="text-[11px] text-gray-400">
                         {schema.fields.filter(f => f.required).length} champ{schema.fields.filter(f => f.required).length > 1 ? 's' : ''} obligatoire{schema.fields.filter(f => f.required).length > 1 ? 's' : ''}
@@ -356,7 +388,9 @@ export default function DataEntryModal({
                             type="submit"
                             form="modal-form"
                             disabled={loading}
-                            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[130px] justify-center">
+                            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[130px] justify-center hover:shadow-md active:scale-95"
+                            style={{ backgroundColor: deptColor }}
+                        >
                             {loading ? (
                                 <>
                                     <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -375,6 +409,7 @@ export default function DataEntryModal({
 
             <style>{`
                 .tabular-nums { font-variant-numeric: tabular-nums; }
+                .focus\\:ring-\\[color\\]:focus { --tw-ring-color: ${deptColor}; }
             `}</style>
         </div>
     );

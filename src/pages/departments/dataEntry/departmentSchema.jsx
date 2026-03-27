@@ -1,9 +1,3 @@
-/**
- * ==========================================
- * COMPLETE DEPARTMENT DATA SCHEMAS
- * Pour TOUS les départements BATEX-CI
- * ==========================================
- */
 
 export const FALLBACK_SCHEMAS = {
     // ==========================================
@@ -112,7 +106,7 @@ export const FALLBACK_SCHEMAS = {
 
     // IT
     // ==========================================
-    IT: {
+    INFORMATIQUE: {
         endpoint: '/api/it-data',
         tableName: 'it_data',
         icon: '💻',
@@ -235,7 +229,6 @@ export const FALLBACK_SCHEMAS = {
             { key: 'commandes', label: 'Nombre de Commandes', type: 'number', required: true, min: 0 },
             { key: 'caisse_entrees', label: 'Entrées de Caisse (FCFA)', type: 'number', required: true, min: 0, step: 1 },
             { key: 'caisse_sorties', label: 'Sorties de Caisse (FCFA)', type: 'number', required: true, min: 0, step: 1 },
-            { key: 'solde_caisse', label: 'Solde de Caisse (FCFA)', type: 'number', required: true, min: 0, step: 1 },
             { key: 'observations', label: 'Observations', type: 'textarea', required: false, rows: 4 },
         ],
         stats: { total: 0, thisMonth: 0, thisWeek: 0, today: 0 }

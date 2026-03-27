@@ -11,10 +11,12 @@ import {
 
 import { dataService } from "../../../services/dataService.js";
 import { formatMoneyFCFA, formatNumberValue } from "../reports/builder/utils/tableFormaterUtils.js";
+import {getDepartmentById} from "../../../config/departments.js";
+import {useAuth} from "../../../context/AuthContext.jsx";
 
 const DEPT_CODE = "COMPTABILITE";
 
-const PERIOD_TYPES  = { DAY: "day", WEEK: "week", MONTH: "month", QUARTER: "quarter", YEAR: "year" };
+const PERIOD_TYPES = { DAY: "day", WEEK: "week", MONTH: "month", QUARTER: "quarter", YEAR: "year" };
 const PERIOD_LABELS = { day: "Jour", week: "Sem.", month: "Mois", quarter: "Trim.", year: "Année" };
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
@@ -33,15 +35,10 @@ const filterDataByPeriod = (data, periodType) => {
     const dateTo = new Date().toISOString().split("T")[0];
     let dateFrom;
     const offsets = {
-        // Jour    → 30 derniers jours  (chaque point = 1 jour)
         day:     () => { const d = new Date(); d.setDate(d.getDate() - 30);        return d; },
-        // Semaine → 7 derniers jours   (chaque point = 1 jour de la semaine)
         week:    () => { const d = new Date(); d.setDate(d.getDate() - 7);         return d; },
-        // Mois    → 12 derniers mois   (chaque point = 1 mois)
         month:   () => { const d = new Date(); d.setMonth(d.getMonth() - 12);      return d; },
-        // Trim.   → 2 ans              (chaque point = 1 trimestre)
         quarter: () => { const d = new Date(); d.setMonth(d.getMonth() - 24);      return d; },
-        // Année   → 5 ans              (chaque point = 1 année)
         year:    () => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return d; },
     };
     dateFrom = (offsets[periodType] || offsets.month)().toISOString().split("T")[0];
@@ -62,49 +59,41 @@ const aggregateByPeriod = (rows, periodType) => {
         const dt = new Date(rawDate + "T12:00:00");
 
         switch (periodType) {
-            // Jour → label = "Lun 21", "Mar 22", etc.
             case "day":
-                key   = rawDate;
+                key = rawDate;
                 label = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
                 break;
-            // Semaine → label = chaque jour de la semaine "Lun 16 mars", "Mar 17 mars"…
-            // On regroupe par semaine ISO (lundi→dimanche) mais affiche le jour précis
-            case "week": {
-                // Clé = date exacte (un point par jour)
-                key   = rawDate;
+            case "week":
+                key = rawDate;
                 label = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
                 break;
-            }
-            // Mois → label = "mars 25", "avr 25"
             case "month":
-                key   = rawDate.slice(0, 7);
-                label = dt.toLocaleDateString("fr-FR", { month: "long", year: "2-digit" });
+                key = rawDate.slice(0, 7);
+                label = dt.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
                 break;
-            // Trimestre → label = "T1 2025", "T2 2025"
             case "quarter": {
                 const q = Math.floor(dt.getMonth() / 3) + 1;
-                key   = `${rawDate.slice(0, 4)}-T${q}`;
+                key = `${rawDate.slice(0, 4)}-T${q}`;
                 label = `T${q} ${rawDate.slice(0, 4)}`;
                 break;
             }
-            // Année → label = "2024", "2025"
             case "year":
                 key = label = rawDate.slice(0, 4);
                 break;
             default:
-                key   = rawDate.slice(0, 7);
-                label = dt.toLocaleDateString("fr-FR", { month: "long", year: "2-digit" });
+                key = rawDate.slice(0, 7);
+                label = dt.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
         }
 
         if (!map.has(key)) {
             map.set(key, { periode: label, ca: 0, commandes: 0, entrees: 0, sorties: 0, solde: 0 });
         }
         const cur = map.get(key);
-        cur.ca        += safeNum(row.ca);
+        cur.ca += safeNum(row.ca);
         cur.commandes += safeNum(row.commandes);
-        cur.entrees   += safeNum(row.caisse_entrees);
-        cur.sorties   += safeNum(row.caisse_sorties);
-        cur.solde     += safeNum(row.solde_caisse);
+        cur.entrees += safeNum(row.caisse_entrees);
+        cur.sorties += safeNum(row.caisse_sorties);
+        cur.solde = safeNum(row.solde_caisse); // solde = dernier état, pas somme
     });
 
     return [...map.entries()]
@@ -168,13 +157,83 @@ const CustomTooltip = ({ active, payload, label, fmt: fmtFn }) => {
     );
 };
 
+/* ─── Mini Donut Chart - Sans ResponsiveContainer pour éviter les warnings ─── */
+const MiniDonutChart = ({ data, colors, size = 160 }) => {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const radius = size * 0.38;
+    const innerRadius = radius * 0.6;
+
+    let startAngle = 0;
+
+    return (
+        <div className="relative" style={{ width: size, height: size }}>
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                {data.map((item, index) => {
+                    const angle = (item.value / total) * 360;
+                    const endAngle = startAngle + angle;
+
+                    const startRad = (startAngle - 90) * (Math.PI / 180);
+                    const endRad = (endAngle - 90) * (Math.PI / 180);
+
+                    const x1 = centerX + radius * Math.cos(startRad);
+                    const y1 = centerY + radius * Math.sin(startRad);
+                    const x2 = centerX + radius * Math.cos(endRad);
+                    const y2 = centerY + radius * Math.sin(endRad);
+
+                    const largeArcFlag = angle > 180 ? 1 : 0;
+
+                    const pathData = `
+                        M ${centerX} ${centerY}
+                        L ${x1} ${y1}
+                        A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}
+                        Z
+                    `;
+
+                    const path = (
+                        <path
+                            key={index}
+                            d={pathData}
+                            fill={colors[index % colors.length]}
+                            stroke="white"
+                            strokeWidth="2"
+                        />
+                    );
+
+                    startAngle = endAngle;
+                    return path;
+                })}
+                <circle
+                    cx={centerX}
+                    cy={centerY}
+                    r={innerRadius}
+                    fill="white"
+                    stroke="white"
+                    strokeWidth="2"
+                />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-sm font-bold text-gray-900">{fmt(total)}</p>
+                    <p className="text-[9px] text-gray-400">Total</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 /* ─── DASHBOARD ──────────────────────────────────────────────────── */
 const ComptabiliteDashboard = () => {
-    const [loading,        setLoading]        = useState(true);
-    const [error,          setError]          = useState("");
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [selectedPeriod, setSelectedPeriod] = useState(PERIOD_TYPES.MONTH);
-    const [isUpdating,     setIsUpdating]     = useState(false);
-    const [allData,        setAllData]        = useState([]);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [allData, setAllData] = useState([]);
+
+    const departmentId = user?.department?.id ?? user?.department_id;
+    const department = getDepartmentById(Number(departmentId));
 
     /* ── Fetch ── */
     const silentRefresh = async () => {
@@ -219,68 +278,65 @@ const ComptabiliteDashboard = () => {
         return () => document.removeEventListener("visibilitychange", onVisible);
     }, []);
 
-    /* ── Données filtrées & agrégées (réactives à selectedPeriod) ── */
-    const filtered   = filterDataByPeriod(allData, selectedPeriod);
+    /* ── Données filtrées & agrégées ── */
+    const filtered = filterDataByPeriod(allData, selectedPeriod);
     const aggregated = aggregateByPeriod(filtered, selectedPeriod);
 
-    const current  = aggregated[aggregated.length - 1] || {};
+    const current = aggregated[aggregated.length - 1] || {};
     const previous = aggregated[aggregated.length - 2] || {};
 
-    const totalCA       = aggregated.reduce((s, m) => s + m.ca,        0);
-    const totalEntrees  = aggregated.reduce((s, m) => s + m.entrees,   0);
-    const totalSorties  = aggregated.reduce((s, m) => s + m.sorties,   0);
-    const totalCmds     = aggregated.reduce((s, m) => s + m.commandes, 0);
-    const margeBrute    = totalEntrees - totalSorties;
-    const tauxMarge     = totalEntrees > 0 ? (margeBrute / totalEntrees) * 100 : 0;
-    const panierGlobal  = totalCmds  > 0 ? totalCA / totalCmds : 0;
+    const totalCA = aggregated.reduce((s, m) => s + m.ca, 0);
+    const totalEntrees = aggregated.reduce((s, m) => s + m.entrees, 0);
+    const totalSorties = aggregated.reduce((s, m) => s + m.sorties, 0);
+    const totalCmds = aggregated.reduce((s, m) => s + m.commandes, 0);
+    const margeBrute = totalEntrees - totalSorties;
+    const tauxMarge = totalEntrees > 0 ? (margeBrute / totalEntrees) * 100 : 0;
+    const panierGlobal = totalCmds > 0 ? totalCA / totalCmds : 0;
 
     const trend = (cur, prev) => prev ? Math.round(((cur - prev) / prev) * 100) : 0;
-    const caTrend  = trend(current.ca        ?? 0, previous.ca        ?? 0);
+    const caTrend = trend(current.ca ?? 0, previous.ca ?? 0);
     const cmdTrend = trend(current.commandes ?? 0, previous.commandes ?? 0);
 
     /* ── Données pour les graphiques ── */
-    // 1) Évolution CA + Marge (line chart)
     const evolutionData = aggregated.map(m => ({
         periode: m.periode,
-        CA:      m.ca,
-        Marge:   m.marge,
-        Entrées: m.entrees,
-        Sorties: m.sorties,
+        CA: m.ca,
+        Marge: m.marge,
     }));
 
-    // 2) Flux trésorerie (bar chart)
     const fluxData = aggregated.map(m => ({
         periode: m.periode,
         Entrées: m.entrees,
         Sorties: m.sorties,
     }));
 
-    // 3) Répartition Entrées vs Sorties (donut)
     const donutFlux = [
         { name: "Entrées", value: totalEntrees },
         { name: "Sorties", value: totalSorties },
     ];
 
-    // 4) Panier moyen (line)
     const panierData = aggregated.map(m => ({ periode: m.periode, "Panier moyen": m.panierMoyen }));
 
-    // 5) Solde cumulé (area)
     let cumul = 0;
     const soldeData = aggregated.map(m => { cumul += m.marge; return { periode: m.periode, Solde: cumul }; });
 
-    // 6) Répartition CA par période (donut — max 6 périodes)
     const caSlice = aggregated.slice(-6);
-    const COLORS  = ["#3b82f6","#10b981","#f59e0b","#8b5cf6","#ef4444","#06b6d4"];
+    const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
     const donutCA = caSlice.map(m => ({ name: m.periode, value: m.ca }));
 
-    const axisTick  = { fontSize: 10, fill: "#9ca3af" };
+    const axisTick = { fontSize: 10, fill: "#9ca3af" };
     const gridColor = "#f3f4f6";
 
     /* ── États ── */
     if (loading) return (
         <div className="min-h-screen bg-[#f8f9fc] flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-[3px] border-blue-100 border-t-blue-500 animate-spin" />
-            <p className="text-sm text-gray-400">Chargement…</p>
+            <div
+                className="w-10 h-10 rounded-full border-[3px] border-blue-100 animate-spin"
+                style={{ borderTopColor: department?.color || "#3b82f6" }}
+            />
+            <p className="text-sm text-gray-400" style={{ color: department?.color || "#6b7280" }}>
+                Chargement…
+            </p>
         </div>
     );
 
@@ -292,7 +348,11 @@ const ComptabiliteDashboard = () => {
                     <h2 className="text-base font-semibold text-gray-900">Erreur</h2>
                 </div>
                 <p className="text-sm text-gray-500 mb-4">{error}</p>
-                <button onClick={loadData} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700">Réessayer</button>
+                <button onClick={loadData} className="px-4 py-2 text-white text-sm font-medium rounded-xl hover:bg-blue-700"
+                        style={{
+                            backgroundColor: department.color,
+                            borderBottomColor: department.color,
+                        }}>Réessayer</button>
             </div>
         </div>
     );
@@ -306,7 +366,12 @@ const ComptabiliteDashboard = () => {
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Aucune donnée</h2>
                 <p className="text-sm text-gray-400 mb-5">Commencez par saisir des données comptables.</p>
                 <button onClick={() => window.location.href = `/departments/data/${DEPT_CODE.toLowerCase()}`}
-                        className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700">
+                        className="px-5 py-2.5 text-white text-sm font-medium rounded-xl "
+                        style={{
+                            backgroundColor: department.color,
+                            borderBottomColor: department.color,
+                        }}
+                >
                     Aller à la saisie
                 </button>
             </div>
@@ -319,18 +384,19 @@ const ComptabiliteDashboard = () => {
             {/* ── HEADER ── */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-widest mb-1.5">Département Comptabilité</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5"
+                       style={{color:department?.color || "#3b82f6"}}
+                    >Département Comptabilité</p>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Tableau de Bord</h1>
                     <p className="text-xs text-gray-400 mt-1 font-medium">
                         {filtered.length} saisie{filtered.length > 1 ? "s" : ""} dans la période · {allData.length} au total
                     </p>
                 </div>
                 <div className="flex items-center gap-2.5 flex-wrap">
-                    {/* Filtre période — impacte TOUT le dashboard */}
                     <PeriodFilter selected={selectedPeriod} onChange={setSelectedPeriod} />
                     <button onClick={loadData}
                             className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50">
-                        <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? "animate-spin text-blue-500" : "text-gray-400"}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? "animate-spin" : "text-gray-400"}`} style={{color:department.color}} />
                         Actualiser
                     </button>
                     <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5">
@@ -342,15 +408,14 @@ const ComptabiliteDashboard = () => {
 
             {isUpdating && (
                 <div className="fixed top-4 right-4 bg-white border border-blue-100 rounded-xl px-3.5 py-2 shadow-md z-50 flex items-center gap-2">
-                    <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
-                    <span className="text-xs font-medium text-blue-600">Actualisation…</span>
+                    <RefreshCw className="w-3.5 h-3.5  animate-spin"  style={{color:department.color}}/>
+                    <span className="text-xs font-medium " style={{color:department.color}}>Actualisation…</span>
                 </div>
             )}
 
             {/* ── 01 KPIs ── */}
             <SectionHeader number="01" title="Indicateurs de la période" />
 
-            {/* Hero CA + petites cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
 
                 {/* Hero card CA */}
@@ -457,20 +522,15 @@ const ComptabiliteDashboard = () => {
                     </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Donut Entrées/Sorties */}
+                {/* Donut Entrées/Sorties - Version corrigée sans ResponsiveContainer avec dimensions fixes */}
                 <ChartCard title="Répartition flux" sub={`${PERIOD_LABELS[selectedPeriod]} — cumul`}>
-                    <ResponsiveContainer width="100%" height={200}>
-                        <RePieChart>
-                            <Pie data={donutFlux} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
-                                 paddingAngle={4} dataKey="value"
-                                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                 labelLine={{ stroke: "#d1d5db", strokeWidth: 1 }}>
-                                <Cell fill="#22c55e" />
-                                <Cell fill="#f87171" />
-                            </Pie>
-                            <Tooltip formatter={(v) => formatMoneyFCFA(v)} />
-                        </RePieChart>
-                    </ResponsiveContainer>
+                    <div className="flex justify-center items-center py-4">
+                        <MiniDonutChart
+                            data={donutFlux}
+                            colors={["#22c55e", "#f87171"]}
+                            size={160}
+                        />
+                    </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <div className="text-center">
                             <p className="text-[9px] font-semibold text-emerald-600 uppercase mb-0.5">Entrées</p>
@@ -512,8 +572,8 @@ const ComptabiliteDashboard = () => {
                         <AreaChart data={soldeData}>
                             <defs>
                                 <linearGradient id="soldeGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%"   stopColor="#06b6d4" stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0}   />
+                                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.2} />
+                                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -540,21 +600,17 @@ const ComptabiliteDashboard = () => {
                     </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Donut CA par période */}
+                {/* Répartition CA par période - Version corrigée sans ResponsiveContainer */}
                 <ChartCard title="Répartition du CA par période" sub={`Dernières ${donutCA.length} périodes`}>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap justify-center">
                         <div className="flex-shrink-0">
-                            <ResponsiveContainer width={180} height={180}>
-                                <RePieChart>
-                                    <Pie data={donutCA} cx="50%" cy="50%" innerRadius={48} outerRadius={80}
-                                         paddingAngle={3} dataKey="value" label={false}>
-                                        {donutCA.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                    </Pie>
-                                    <Tooltip formatter={(v) => formatMoneyFCFA(v)} />
-                                </RePieChart>
-                            </ResponsiveContainer>
+                            <MiniDonutChart
+                                data={donutCA}
+                                colors={COLORS}
+                                size={150}
+                            />
                         </div>
-                        <div className="flex flex-col gap-2 flex-1">
+                        <div className="flex flex-col gap-2 flex-1 min-w-[140px]">
                             {donutCA.map((item, i) => {
                                 const pct = totalCA > 0 ? ((item.value / totalCA) * 100).toFixed(1) : 0;
                                 return (

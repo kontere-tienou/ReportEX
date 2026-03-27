@@ -43,7 +43,7 @@ export const DEPARTMENT_REPORT_TEMPLATES = {
     },
 
     // 2. Comptabilité
-    COMPTA: {
+    COMPTABILITE: {
         id: 2,
         name: 'Comptabilité',
         fields: [
