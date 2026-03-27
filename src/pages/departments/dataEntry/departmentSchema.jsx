@@ -76,7 +76,7 @@ export const FALLBACK_SCHEMAS = {
             { key: 'taux_absenteisme', label: 'Taux d\'Absentéisme (%)', type: 'number', required: true, min: 0, max: 100, step: 0.1 },
             { key: 'dechet_m3', label: 'Déchet (m³)', type: 'number', required: true, min: 0, step: 0.01 },
            // { key: 'temps_travaille', label: 'Temps Travaillé (H)', type: 'number', required: true, min: 0, step: 0.5 },
-            { key: 'qte_emballe', label: 'Quantité Emballée (kg)', type: 'number', required: false, min: 0 },
+           // { key: 'qte_emballe', label: 'Quantité Emballée (kg)', type: 'number', required: false, min: 0 },
             { key: 'pannes_incidents', label: 'Pannes / Incidents (JSON)', type: 'textarea', required: false, rows: 3 },
             { key: 'remarques', label: 'Remarques', type: 'textarea', required: false, rows: 4 },
         ],
