@@ -67,10 +67,10 @@ export default function Reports() {
 
     // ✅ FIX: useCallback pour éviter re-création
     const loadDepartmentStats = useCallback(async () => {
-        if (!isDirection || !user?.department_id) return;
+        if (!isDirection || !deptName) return;
 
         try {
-            const res = await reportService.getDepartmentStats(user.department_id);
+            const res = await reportService.getDepartmentStatsByCode(deptName);
             const stats = res.data?.stats || res.data?.data?.stats || {};
 
             setDepartmentStats({
@@ -83,112 +83,44 @@ export default function Reports() {
         } catch (e) {
             console.error("Erreur stats département:", e);
         }
-    }, [isDirection, user?.department_id]);
+    }, [isDirection, deptName]);
 
     // ✅ FIX: useCallback + gestion erreurs + ensure array
     const loadReports = useCallback(async () => {
         setLoading(true);
         try {
-            const params = {};
-            if (searchTerm) params.search = searchTerm;
-
-            let reportsData = [];
-
-            if (filter === "mes-rapports") {
-                const res = await reportService.getMy(params);
+            // Pour les utilisateurs normaux, utiliser getMy au lieu de getByDepartment
+            if (!isDirection) {
+                const res = await reportService.getMy({ search: searchTerm });
                 const data = res.data?.data?.reports || res.data?.reports || res.data;
-                reportsData = Array.isArray(data) ? data : [];
-            } else if (filter === "tous") {
-                if (isDirection) {
-                    const res = await reportService.getAll(params);
-                    const data = res.data?.data?.reports || res.data?.reports || res.data;
-                    reportsData = Array.isArray(data) ? data : [];
-                } else {
-                    // ✅ FIX: Parallel requests avec error handling
-                    const [myRes, publicRes] = await Promise.allSettled([
-                        reportService.getMy(params),
-                        reportService.getAll({ ...params, visibility: "public" }),
-                    ]);
-
-                    const myReports = myRes.status === 'fulfilled'
-                        ? (myRes.value.data?.data?.reports || myRes.value.data?.reports || myRes.value.data || [])
-                        : [];
-
-                    const publicReports = publicRes.status === 'fulfilled'
-                        ? (publicRes.value.data?.data?.reports || publicRes.value.data?.reports || publicRes.value.data || [])
-                        : [];
-
-                    // ✅ Ensure arrays
-                    const myArray = Array.isArray(myReports) ? myReports : [];
-                    const publicArray = Array.isArray(publicReports) ? publicReports : [];
-
-                    const combined = [...myArray];
-                    publicArray.forEach((pr) => {
-                        if (!combined.find((r) => r.id === pr.id)) {
-                            combined.push(pr);
-                        }
-                    });
-
-                    reportsData = combined;
-                }
+                setReports(Array.isArray(data) ? data : []);
             } else {
-                // Filter by status
-                params.status = filter;
-
-                if (isDirection) {
-                    const res = await reportService.getAll(params);
-                    const data = res.data?.data?.reports || res.data?.reports || res.data;
-                    reportsData = Array.isArray(data) ? data : [];
-                } else {
-                    const [myRes, publicRes] = await Promise.allSettled([
-                        reportService.getMy(params),
-                        reportService.getAll({ ...params, status: filter, visibility: "public" }),
-                    ]);
-
-                    const myReports = myRes.status === 'fulfilled'
-                        ? (myRes.value.data?.data?.reports || myRes.value.data?.reports || myRes.value.data || [])
-                        : [];
-
-                    const publicReports = publicRes.status === 'fulfilled'
-                        ? (publicRes.value.data?.data?.reports || publicRes.value.data?.reports || publicRes.value.data || [])
-                        : [];
-
-                    const myArray = Array.isArray(myReports) ? myReports : [];
-                    const publicArray = Array.isArray(publicReports) ? publicReports : [];
-
-                    const combined = [...myArray];
-                    publicArray.forEach((pr) => {
-                        if (!combined.find((r) => r.id === pr.id)) {
-                            combined.push(pr);
-                        }
-                    });
-
-                    reportsData = combined;
-                }
+                // Pour DG, utiliser getByDepartment
+                const res = await reportService.getByDepartment(deptName, {
+                    search: searchTerm,
+                    status: filter !== 'tous' ? filter : undefined
+                });
+                const data = res.data?.data?.reports || res.data?.reports || res.data;
+                setReports(Array.isArray(data) ? data : []);
             }
-
-            // ✅ FIX: Ensure final result is array
-            setReports(Array.isArray(reportsData) ? reportsData : []);
         } catch (e) {
             console.error("Erreur chargement rapports:", e);
-            // ✅ FIX: Set empty array on error
             setReports([]);
         } finally {
             setLoading(false);
         }
-    }, [filter, isDirection, searchTerm]);
-
-    // ✅ FIX: Load on mount and filter change
+    }, [filter, isDirection, searchTerm, deptName]);
+    // Chargement initial
     useEffect(() => {
         if (user) {
-            if (isDirection) {
+            if (isDirection && deptName) {
                 loadDepartmentStats();
             }
             loadReports();
         }
-    }, [user, filter, isDirection, loadReports, loadDepartmentStats]);
+    }, [user, filter, isDirection, loadReports, loadDepartmentStats, deptName]);
 
-    // ✅ FIX: Debounce search with cleanup
+// Debounce search
     useEffect(() => {
         if (!user) return;
 
@@ -200,6 +132,7 @@ export default function Reports() {
     }, [searchTerm, user, loadReports]);
 
     const goDetails = (report) => {
+        // Navigation avec departmentCode et reportId
         navigate(`/departments/${deptName}/reports/${report.id}`);
     };
 
@@ -210,7 +143,7 @@ export default function Reports() {
     const isReportAccessible = (report) => {
         const isOwner = report.user_id === user?.id;
         const isDG = isDirection;
-        const sameDept = report.department_id === user?.department_id;
+        const sameDept = report.department_code === deptName || report.department_id === user?.department_id;
         const isPublic = report.visibility === "public";
         const isDepartment = report.visibility === "department";
 

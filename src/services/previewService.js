@@ -9,9 +9,6 @@ class PreviewDataService {
         this.pendingRequests = new Map();
     }
 
-    /**
-     * Fetch multiple metrics in one batch request
-     */
     async fetchBatchMetrics(department, metricRequests, options = {}) {
         const cacheKey = `batch_${department}_${JSON.stringify(metricRequests)}_${JSON.stringify(options.dateRange)}`;
 
@@ -47,7 +44,6 @@ class PreviewDataService {
             }
         });
     }
-
     async fetchPreviewData(department, options = {}) {
         const cacheKey = `preview_${department}_${JSON.stringify(options)}`;
 
@@ -123,9 +119,6 @@ class PreviewDataService {
             }
         });
     }
-    /**
-     * Fetch multiple chart series in one request
-     */
     async fetchBatchChartData(department, chartConfigs, options = {}) {
         const cacheKey = `batch_chart_${department}_${JSON.stringify(chartConfigs)}_${JSON.stringify(options.dateRange)}`;
 
@@ -186,7 +179,6 @@ class PreviewDataService {
             }
         });
     }
-
     // Keep your existing methods but make them use the batch endpoint
     async fetchMetrics(department, field, calculation, period, options = {}) {
         const results = await this.fetchBatchMetrics(department, [

@@ -6,10 +6,12 @@ import {
     MessageSquare, Lock, Send, AlertCircle, FileText,
     Calendar, User, Building2, Clock, Edit, Trash2, Globe, Eye,
 } from 'lucide-react';
-import { reportAccessService, reportService } from '../../../services/reportApi.js';
+import { reportService } from '../../../services/reportApi.js';
 import {Alert, Popover, ToastContainer, useToast} from '../../../components/ui/index.js';
 import { branding } from '../../../config/brandingConstant.js';
 import CustomReportRenderer from "./builder/customReportRender.jsx";
+import reportAccessService from "../../../services/reportAccessService.js";
+import PrintHandler from "../../../components/PrintHandler.jsx";
 
 /* ─── Helpers ─── */
 const fmtDate = (d) => d
@@ -191,7 +193,8 @@ function Comment({ comment }) {
 
 /* ─── Main ─── */
 export default function ReportDetails() {
-    const { id } = useParams();
+   // const { id } = useParams();
+    const { id, deptName } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
     const { toasts, addToast, removeToast } = useToast();
@@ -203,7 +206,8 @@ export default function ReportDetails() {
     const [newComment, setNewComment] = useState('');
     const [validationData, setValidationData] = useState({ status: '', comments: '' });
     const [showValidationModal, setShowValidationModal] = useState(false);
-
+// Vérifier si deptName est un code valide (pas un nombre)
+    const isValidDepartmentCode = deptName && isNaN(parseInt(deptName));
     useEffect(() => {
         let mounted = true;
         loadReport(mounted);
@@ -212,29 +216,56 @@ export default function ReportDetails() {
 
     const loadComments = async (reportId = id, mounted = true) => {
         try {
-            const res = await reportService.getComments(reportId);
+            let res;
+            if (deptName && deptName !== 'undefined' && isNaN(parseInt(deptName))) {
+                // Utiliser la nouvelle route avec departmentCode
+                res = await reportService.getCommentsByDepartment(deptName, reportId);
+            } else {
+                res = await reportService.getComments(reportId);
+            }
             const c = res.data?.data?.comments || res.data?.comments || [];
             if (mounted) setComments(c);
             return c;
-        } catch { if (mounted) setComments([]); return []; }
+        } catch {
+            if (mounted) setComments([]);
+            return [];
+        }
     };
+
 
     const loadReport = async (mounted = true) => {
         setLoading(true);
         try {
-            const res = await reportService.getById(id);
+            let res;
+
+            // Utiliser la bonne méthode selon si on a un departmentCode valide
+            if (isValidDepartmentCode && id) {
+                res = await reportService.getByIdWithDepartment(deptName, id);
+            } else if (id) {
+                res = await reportService.getById(id);
+            } else {
+                throw new Error("ID du rapport manquant");
+            }
+
             const payload = res.data?.data || res.data || {};
             if (!mounted) return;
+
             setReport(payload.report || null);
             setPermissions(payload.permissions || null);
+
             if (payload.permissions?.canRead) {
                 await Promise.all([
                     loadComments(id, mounted),
-                    reportService.markAsRead(id).catch(() => null),
+                    // Marquer comme lu
+                    isValidDepartmentCode
+                        ? reportService.markAsReadWithDepartment(deptName, id).catch(() => null)
+                        : reportService.markAsRead(id).catch(() => null),
                 ]);
             }
         } catch (err) {
             if (!mounted) return;
+            console.error("Error loading report:", err);
+
             if (err.response?.status === 403) {
                 const extra = err.response?.data?.data || err.response?.data?.details || {};
                 setReport(null);
@@ -382,6 +413,8 @@ export default function ReportDetails() {
         }
     };
 
+
+
     /* ─── Render guards ─── */
     if (loading) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoadingScreen /></>;
 
@@ -450,7 +483,7 @@ export default function ReportDetails() {
                                 </Btn>
                             )}
                             <Btn variant="ghost" icon={Download} onClick={handleDownloadPdf} title="Télécharger PDF" />
-                            <Btn variant="ghost" icon={Printer} onClick={() => window.print()} title="Imprimer" />
+                            <PrintHandler report={report} />
                             {permissions?.canEdit && (
                                 <Btn
                                     variant="ghost"

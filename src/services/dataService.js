@@ -1,8 +1,6 @@
 // dataService.js
 import api from './api.js';
 
-// Événement custom émis après chaque mutation (create / update / delete)
-// Le dashboard l'écoute pour se rafraîchir instantanément
 const emitDataChanged = (deptCode) => {
     window.dispatchEvent(
         new CustomEvent('dataservice:changed', { detail: { deptCode } })
@@ -10,27 +8,73 @@ const emitDataChanged = (deptCode) => {
 };
 
 export const dataService = {
-    async getAll(deptCode, params = {}) {
-        // On passe un timestamp pour forcer le backend à bypasser son cache
-        // (le cache backend est de 30s — sans ce param, un refresh immédiat
-        //  après une mutation retournerait les anciennes données)
+   /* async getAll(deptCode, params = {}) {
         const response = await api.get(`/${deptCode}/data`, {
             params: {
                 ...params,
-                // Limite haute pour récupérer tout l'historique
                 limit: params.limit || 1000,
                 _t: Date.now(),   // cache-busting
             },
         });
 
-        // Le backend renvoie { data: [...], pagination: {...} } via paginatedResponse
-        // On extrait le tableau de données dans tous les cas
         const payload = response.data;
         if (Array.isArray(payload)) return payload;
         if (Array.isArray(payload?.data)) return payload.data;
         return [];
-    },
+    },*/
 
+    async getAll(deptCode, params = {}) {
+        try {
+            const response = await api.get(`/${deptCode}/data`, {
+                params: {
+                    ...params,
+                    limit: params.limit || 1000,
+                    _t: Date.now(),
+                },
+            });
+
+            // ✅ Gestion plus robuste des différents formats
+            let result = [];
+
+            // Cas 1: La réponse a une structure avec data et success
+            if (response.data && response.data.success && response.data.data) {
+                if (Array.isArray(response.data.data)) {
+                    result = response.data.data;
+                } else if (response.data.data.data && Array.isArray(response.data.data.data)) {
+                    result = response.data.data.data;
+                } else if (response.data.data.items && Array.isArray(response.data.data.items)) {
+                    result = response.data.data.items;
+                } else {
+                    result = [];
+                }
+            }
+            // Cas 2: La réponse est directement un tableau
+            else if (Array.isArray(response.data)) {
+                result = response.data;
+            }
+            // Cas 3: La réponse a une propriété data qui est un tableau
+            else if (response.data && Array.isArray(response.data.data)) {
+                result = response.data.data;
+            }
+            // Cas 4: La réponse a une structure paginée
+            else if (response.data && response.data.data && Array.isArray(response.data.data.data)) {
+                result = response.data.data.data;
+            }
+            // Cas 5: Format non standard mais avec des données
+            else if (response.data && typeof response.data === 'object') {
+                // Chercher le premier tableau dans l'objet
+                for (let key in response.data) {
+                    if (Array.isArray(response.data[key])) {
+                        result = response.data[key];
+                        break;
+                    }
+                }
+            }
+            return result;
+        } catch (error) {
+            throw error;
+        }
+    },
     async getById(deptCode, id) {
         const response = await api.get(`/${deptCode}/data/${id}`);
         return response.data.data;

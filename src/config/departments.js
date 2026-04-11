@@ -293,6 +293,7 @@ const departmentSpecificItems = {
     11: [ // RH
         { name: 'Employés', href: 'employees', icon: Users },
         { name: 'Contrats', href: 'contracts', icon: FileText },
+        { name: 'Mes Rapports', href: 'reports', icon: 'FileText' },
         { name: 'Congés', href: 'leaves', icon: Calendar },
         { name: 'Données', href: 'data', icon: 'data' },
         { name: 'Recrutement', href: 'recruitment', icon: UserPlus }

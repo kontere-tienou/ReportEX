@@ -33,3 +33,48 @@
         @apply block text-sm font-medium text-gray-700 mb-2;
     }
 }
+
+/* Classes pour l'impression */
+.print-area {
+    background: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+}
+
+/* Sections qui doivent rester ensemble */
+.keep-with-next {
+    page-break-after: avoid;
+}
+
+.keep-with-previous {
+    page-break-before: avoid;
+}
+
+/* Éviter les veuves et orphelines */
+p, h1, h2, h3, h4, h5, h6 {
+    orphans: 3;
+    widows: 3;
+}
+
+/* Tableaux responsifs pour l'impression */
+@media print {
+    .responsive-table {
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    .responsive-table table {
+        width: 100% !important;
+        font-size: 10pt !important;
+    }
+
+    .responsive-table td,
+    .responsive-table th {
+        padding: 6px 4px !important;
+    }
+
+    /* Éviter les coupures dans les cellules */
+    td, th {
+        page-break-inside: avoid;
+    }
+}

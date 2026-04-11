@@ -103,34 +103,60 @@ export default function Data() {
     /* ── Init ── */
     useEffect(() => {
         const init = async () => {
-            if (!deptCode) { setError('Impossible de déterminer le département'); setSchemaLoading(false); return; }
+            if (!deptCode) {
+                setError('Impossible de déterminer le département');
+                setSchemaLoading(false);
+                return;
+            }
+
             const isValid = await validateDepartmentCode(deptCode);
-            if (!isValid)  { setError(`Département "${deptCode}" non trouvé`);   setSchemaLoading(false); return; }
+            if (!isValid) {
+                setError(`Département "${deptCode}" non trouvé`);
+                setSchemaLoading(false);
+                return;
+            }
+
             await loadSchema();
         };
-        init();
-    }, [deptCode]);
 
+        init();
+    }, [deptCode]); // ✅ Dépendance correcte
+
+// Séparez loadSchema et loadData pour éviter les dépendances circulaires
     const loadSchema = async () => {
-        setSchemaLoading(true); setError(null);
+        setSchemaLoading(true);
+        setError(null);
         try {
             const s = await schemaService.getDepartmentSchema(deptCode);
             if (!s) throw new Error('Schéma non trouvé');
             setSchema(s);
-            await loadData();
+            await loadData(); // Appel explicite après avoir défini le schéma
         } catch (err) {
             setError(err.message || 'Erreur schéma');
             addToast('Erreur lors du chargement du schéma', 'error', 3000);
-        } finally { setSchemaLoading(false); }
+        } finally {
+            setSchemaLoading(false);
+        }
     };
 
+// Modifiez loadData pour éviter les dépendances
     const loadData = async () => {
         setLoading(true);
         try {
+            // Test sans aucun paramètre
             const data = await dataService.getAll(deptCode);
-            setDataList(Array.isArray(data) ? data : data?.data ?? []);
-        } catch { addToast('Erreur lors du chargement des données', 'error', 3000); }
-        finally  { setLoading(false); }
+            setDataList(Array.isArray(data) ? data : []);
+
+            // Si pas de données, affichez un message plus explicite
+            if (data.length === 0) {
+            }
+        } catch (error) {
+            console.error('Erreur chargement données:', error);
+            addToast('Erreur lors du chargement des données', 'error', 3000);
+            setDataList([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     /* ── CRUD ── */
@@ -266,7 +292,7 @@ export default function Data() {
                 className="w-10 h-10 rounded-full border-[3px] border-blue-100 animate-spin"
                 style={{ borderTopColor: department?.color || "#3b82f6" }}
             />
-            <p className="text-sm text-gray-400" style={{ color: department?.color || "#6b7280" }}>
+            <p className="text-sm text-gray-400" style={{color: department?.color || "#6b7280"}}>
                 Chargement…
             </p>
         </div>

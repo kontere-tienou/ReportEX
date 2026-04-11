@@ -17,10 +17,12 @@ const GenericDepartmentDashboard = ({
 
     useEffect(() => {
         loadDashboardData();
-    }, [user?.department_id]);
+    }, [user?.department?.id, user?.department_id]);
 
-    const loadDashboardData = async () => {
-        if (!user?.department_id) {
+    /*const loadDashboardData = async () => {
+        const deptId = user?.department?.id || user?.department_id;
+
+        if (!deptId) {
             console.warn('No department_id found for user:', user);
             setLoading(false);
             return;
@@ -45,8 +47,41 @@ const GenericDepartmentDashboard = ({
         } finally {
             setLoading(false);
         }
-    };
+    };*/
+    const loadDashboardData = async () => {
+        // Look in both possible locations for the ID
+        const deptId = user?.department?.id || user?.department_id;
 
+        // Check if deptId is actually a value and not the string "undefined"
+        if (!deptId || deptId === 'undefined') {
+            console.warn('Dashboard: Waiting for valid department_id...', user);
+            // Keep loading true or set to false depending on if you expect it to arrive later
+            return;
+        }
+
+        try {
+            setLoading(true); // Ensure loading state is set
+            const statsRes = await reportService.getDepartmentStats(deptId);
+
+            // Handle the nested data structure from your successResponse helper
+            const statsData = statsRes.data?.stats || statsRes.data?.data?.stats || {};
+
+            setStats({
+                total_reports: statsData.total || 0,
+                validated_reports: statsData.validated || 0,
+                pending_reports: statsData.pending || 0,
+                draft_reports: statsData.drafts || 0,
+                rejected_reports: statsData.rejected || 0,
+                // Re-calculate rates if they aren't in the SQL
+                validation_rate: statsData.total > 0 ? Math.round((statsData.validated / statsData.total) * 100) : 0,
+                rejection_rate: statsData.total > 0 ? Math.round((statsData.rejected / statsData.total) * 100) : 0,
+            });
+        } catch (error) {
+            console.error('Erreur chargement dashboard:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
