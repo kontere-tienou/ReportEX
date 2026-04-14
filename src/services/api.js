@@ -11,7 +11,7 @@ const getBaseUrl = () => {
     }
 
     // 2. Si on est sur Vercel, on force l'URL Railway de production
-    if (window.location.hostname.includes('vercel.app')) {
+    if (window.location.hostname.includes('https://report-ex.vercel.app')) {
         return 'https://reportex-back-end-production.up.railway.app/api';
     }
 
