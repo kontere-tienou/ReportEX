@@ -33,10 +33,11 @@ const getBaseUrl = () => {
     // 3. Si on est sur Railway (rare pour frontend)
     if (window.location.hostname.includes('railway.app')) {
         return 'https://reportex-back-end-production.up.railway.app/api';
+        //reportex-back-end-production.up.railway.app
     }
 
     // 4. Par défaut, mode local
-    return 'http://localhost:5008/api';
+    return 'http://reportex-back-end-production.up.railway.app/api';
 };
 const api = axios.create({
     baseURL: getBaseUrl(),
