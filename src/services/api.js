@@ -3,20 +3,19 @@ import axios from 'axios';
 /* ==========================================================
    AXIOS INSTANCE CONFIGURATION
 ========================================================== */
-
 // Détection intelligente de l'URL de l'API
 const getBaseUrl = () => {
-    // 1. Priorité à la variable d'environnement (Vite)
+    // 1. Variable d'environnement (Idéal pour Vercel)
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
 
-    // 2. Si on est sur le domaine Railway en production, on utilise l'API Railway
-    if (window.location.hostname.includes('railway.app')) {
+    // 2. Si on est sur Vercel, on force l'URL Railway de production
+    if (window.location.hostname.includes('vercel.app')) {
         return 'https://reportex-back-end-production.up.railway.app/api';
     }
 
-    // 3. Par défaut, mode local
+    // 3. Par défaut (Développement local)
     return 'http://localhost:5008/api';
 };
 
