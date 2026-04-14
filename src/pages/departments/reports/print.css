@@ -1,0 +1,117 @@
+/* styles/print.css - À ajouter dans votre fichier CSS principal */
+
+/* Styles d'impression */
+@media print {
+    /* Reset pour l'impression */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    /* Cacher les éléments non imprimables */
+    .print\:hidden,
+    .no-print,
+    header:not(.print-header),
+    footer:not(.print-footer),
+    .sidebar,
+    .actions-bar,
+    button,
+    .btn,
+    .comment-section,
+    .side-section,
+    .filters,
+    .modal,
+    .popover {
+        display: none !important;
+    }
+
+    /* Zone d'impression principale */
+    .print-area {
+        position: relative !important;
+        display: block !important;
+        visibility: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+        background: white !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* Éviter les coupures maladroites */
+    .print-area,
+    .print-area * {
+        page-break-inside: avoid;
+        page-break-before: auto;
+        page-break-after: auto;
+        orphans: 3;
+        widows: 3;
+    }
+
+    /* Forcer les sauts de page quand nécessaire */
+    .page-break-before {
+        page-break-before: always !important;
+    }
+
+    .page-break-after {
+        page-break-after: always !important;
+    }
+
+    .page-break-inside {
+        page-break-inside: avoid !important;
+    }
+
+    /* Éléments qui ne doivent pas être coupés */
+    .keep-together,
+    .report-header,
+    .report-section,
+    .data-table,
+    .signature-block {
+        page-break-inside: avoid !important;
+    }
+
+    /* Tables */
+    table {
+        page-break-inside: avoid;
+        width: 100%;
+    }
+
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tfoot {
+        display: table-footer-group;
+    }
+
+    /* Images */
+    img {
+        max-width: 100% !important;
+        page-break-inside: avoid;
+    }
+
+    /* Marges pour le document imprimé */
+    @page {
+        size: A4;
+        margin: 1.5cm;
+
+        @top-center {
+            content: "BATEX-CI - Rapport de Production";
+            font-size: 10pt;
+            font-family: Arial, sans-serif;
+        }
+
+        @bottom-center {
+            content: "Page " counter(page) " / " counter(pages);
+            font-size: 9pt;
+            font-family: Arial, sans-serif;
+        }
+    }
+}
