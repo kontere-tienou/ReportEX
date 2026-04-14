@@ -5,7 +5,7 @@ import axios from 'axios';
 ========================================================== */
 
 // Détection intelligente de l'URL de l'API
-const getBaseUrl = () => {
+/*const getBaseUrl = () => {
     // 1. Priorité à la variable d'environnement (Vite)
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
@@ -18,8 +18,26 @@ const getBaseUrl = () => {
 
     // 3. Par défaut, mode local
     return 'http://localhost:5008/api';
-};
+};*/
+const getBaseUrl = () => {
+    // 1. Priorité à la variable d'environnement (Vite)
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
 
+    // 2. En production (Vercel), utilisez l'URL absolue du backend
+    if (window.location.hostname === 'report-ex.vercel.app') {
+        return 'https://reportex-back-end-production.up.railway.app/api';
+    }
+
+    // 3. Si on est sur Railway (rare pour frontend)
+    if (window.location.hostname.includes('railway.app')) {
+        return 'https://reportex-back-end-production.up.railway.app/api';
+    }
+
+    // 4. Par défaut, mode local
+    return 'http://localhost:5008/api';
+};
 const api = axios.create({
     baseURL: getBaseUrl(),
     headers: {
@@ -32,8 +50,25 @@ const api = axios.create({
 /* ==========================================================
    REQUEST INTERCEPTOR (Attach JWT Token)
 ========================================================== */
-
+// Dans api.interceptors.request.use
 api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+
+        // Force CORS headers
+        config.headers['Access-Control-Allow-Origin'] = '*';
+
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        console.log('📤 Requête envoyée à:', config.baseURL + config.url);
+
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+/*api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
 
@@ -44,7 +79,7 @@ api.interceptors.request.use(
         return config;
     },
     (error) => Promise.reject(error)
-);
+);/*
 
 /* ==========================================================
    RESPONSE INTERCEPTOR (Auto Logout on 401)
