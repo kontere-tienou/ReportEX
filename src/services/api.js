@@ -17,8 +17,7 @@ const getBaseUrl = () => {
     }
 
     // 3. Par défaut, mode local
-    //return 'http://localhost:5008/api';
-    return 'https://reportex-back-end-production.up.railway.app/api';
+    return 'http://localhost:5008/api';
 };
 
 const api = axios.create({
